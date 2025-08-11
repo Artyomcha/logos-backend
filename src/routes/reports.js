@@ -4,27 +4,22 @@ const DatabaseService = require('../services/databaseService');
 const auth = require('../middleware/auth');
 const combinedAuth = require('../middleware/combinedAuth');
 const multer = require('multer');
-const { S3Client } = require('@aws-sdk/client-s3');
-const multerS3 = require('multer-s3');
+const path = require('path');
+const fs = require('fs');
 
-// Настройка S3 клиента для Яндекс.Облако
-const s3Client = new S3Client({
-  region: 'ru-central1',
-  endpoint: 'https://storage.yandexcloud.net',
-  credentials: {
-    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
-    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
-  }
-});
-
-// Простое хранилище S3 для отчетов
-const reportStorage = multerS3({
-  s3: s3Client,
-  bucket: process.env.YANDEX_BUCKET_NAME,
-  key: (req, file, cb) => {
+// Простое локальное хранилище для отчетов
+const reportStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const fileName = `uploads/companies/${companyName}/reports/${Date.now()}-${file.originalname}`;
-    cb(null, fileName);
+    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'reports');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
@@ -65,9 +60,13 @@ router.post('/upload', combinedAuth, reportUpload.single('report'), async (req, 
     console.log('Company name from request:', companyName);
     console.log('File uploaded:', req.file.originalname);
     
-    // S3 возвращает URL файла
-    const file_url = req.file.location;
-    console.log('S3 file URL:', file_url);
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const newName = `report_${Date.now()}${ext}`;
+    const newPath = path.join(req.file.destination, newName);
+    fs.renameSync(req.file.path, newPath);
+    
+    const file_url = `/uploads/companies/${companyName}/reports/${newName}`;
+    console.log('File URL:', file_url);
     
     const connection = await DatabaseService.getCompanyConnection(companyName);
     await connection.query(

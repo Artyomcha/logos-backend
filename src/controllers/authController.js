@@ -48,10 +48,14 @@ exports.register = async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Handle avatar upload (S3)
+    // Handle avatar upload
     let avatarUrl = null;
     if (req.file) {
-      avatarUrl = req.file.location; // S3 возвращает URL в location
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const newName = `avatar_${Date.now()}${ext}`;
+      const newPath = path.join(req.file.destination, newName);
+      fs.renameSync(req.file.path, newPath);
+      avatarUrl = `/uploads/companies/${finalCompanyName}/avatars/${newName}`;
     }
 
     // Create company database if it doesn't exist (for managers)

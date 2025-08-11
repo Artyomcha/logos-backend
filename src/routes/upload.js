@@ -9,26 +9,19 @@ const combinedAuth = require('../middleware/combinedAuth');
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-const multerS3 = require('multer-s3');
-
-// Настройка S3 клиента для Яндекс.Облако
-const s3Client = new S3Client({
-  region: 'ru-central1',
-  endpoint: 'https://storage.yandexcloud.net',
-  credentials: {
-    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
-    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
-  }
-});
-
-// Простое хранилище S3 для файлов
-const fileStorage = multerS3({
-  s3: s3Client,
-  bucket: process.env.YANDEX_BUCKET_NAME,
-  key: (req, file, cb) => {
+// Простое локальное хранилище для файлов
+const fileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const fileName = `uploads/companies/${companyName}/files/${Date.now()}-${file.originalname}`;
-    cb(null, fileName);
+    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'files');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 

@@ -8,27 +8,19 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const { S3Client } = require('@aws-sdk/client-s3');
-const multerS3 = require('multer-s3');
-
-// Настройка S3 клиента для Яндекс.Облако
-const s3Client = new S3Client({
-  region: 'ru-central1',
-  endpoint: 'https://storage.yandexcloud.net',
-  credentials: {
-    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
-    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
-  }
-});
-
-// Простое хранилище S3 для аватаров
-const avatarStorage = multerS3({
-  s3: s3Client,
-  bucket: process.env.YANDEX_BUCKET_NAME,
-  key: (req, file, cb) => {
+// Простое локальное хранилище для аватаров
+const avatarStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const fileName = `uploads/companies/${companyName}/avatars/${Date.now()}-${file.originalname}`;
-    cb(null, fileName);
+    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'avatars');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
@@ -110,7 +102,12 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });
     
-    const avatarUrl = req.file.location; // S3 возвращает URL в location
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const newName = `avatar_${Date.now()}${ext}`;
+    const newPath = path.join(req.file.destination, newName);
+    fs.renameSync(req.file.path, newPath);
+    
+    const avatarUrl = `/uploads/companies/${req.user.companyName}/avatars/${newName}`;
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     await connection.query(
       'UPDATE user_auth SET avatar_url = $1 WHERE id = $2',
