@@ -6,8 +6,7 @@ const fs = require('fs');
 const DatabaseService = require('../services/databaseService');
 const auth = require('../middleware/auth');
 const combinedAuth = require('../middleware/combinedAuth');
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
 
 // Простое локальное хранилище для файлов
 const fileStorage = multer.diskStorage({
@@ -28,144 +27,6 @@ const fileStorage = multer.diskStorage({
 const upload = multer({ 
   storage: fileStorage,
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB
-});
-
-// Генерация presigned URL для загрузки аватара
-router.post('/avatar-upload-url', auth, async (req, res) => {
-  try {
-    const { fileName, fileType } = req.body;
-    const companyName = req.user.companyName || 'general';
-    
-    if (!fileName || !fileType) {
-      return res.status(400).json({ message: 'Имя файла и тип обязательны' });
-    }
-
-    const key = `logos-ai/companies/${companyName}/avatars/${Date.now()}-${fileName}`;
-    
-    const command = new PutObjectCommand({
-      Bucket: process.env.YANDEX_BUCKET_NAME,
-      Key: key,
-      ContentType: fileType,
-      Metadata: {
-        'company-name': companyName,
-        'user-id': req.user.id.toString()
-      }
-    });
-
-    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 час
-
-    res.json({
-      uploadUrl: presignedUrl,
-      fileUrl: `https://storage.yandexcloud.net/${process.env.YANDEX_BUCKET_NAME}/${key}`,
-      key: key
-    });
-  } catch (error) {
-    console.error('Error generating avatar upload URL:', error);
-    res.status(500).json({ message: 'Ошибка генерации ссылки для загрузки' });
-  }
-});
-
-// Генерация presigned URL для загрузки отчета
-router.post('/report-upload-url', combinedAuth, async (req, res) => {
-  try {
-    const { fileName, fileType } = req.body;
-    const companyName = req.body.companyName || req.user.companyName || 'general';
-    
-    if (!fileName || !fileType) {
-      return res.status(400).json({ message: 'Имя файла и тип обязательны' });
-    }
-
-    if (req.user.role !== 'manager') {
-      return res.status(403).json({ message: 'Нет доступа' });
-    }
-
-    const key = `logos-ai/companies/${companyName}/reports/${Date.now()}-${fileName}`;
-    
-    const command = new PutObjectCommand({
-      Bucket: process.env.YANDEX_BUCKET_NAME,
-      Key: key,
-      ContentType: fileType,
-      Metadata: {
-        'company-name': companyName,
-        'user-id': req.user.id.toString(),
-        'file-type': 'report'
-      }
-    });
-
-    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 час
-
-    res.json({
-      uploadUrl: presignedUrl,
-      fileUrl: `https://storage.yandexcloud.net/${process.env.YANDEX_BUCKET_NAME}/${key}`,
-      key: key
-    });
-  } catch (error) {
-    console.error('Error generating report upload URL:', error);
-    res.status(500).json({ message: 'Ошибка генерации ссылки для загрузки' });
-  }
-});
-
-// Генерация presigned URL для загрузки общих файлов
-router.post('/file-upload-url', combinedAuth, async (req, res) => {
-  try {
-    const { fileName, fileType } = req.body;
-    const companyName = req.body.companyName || req.user.companyName || 'general';
-    
-    if (!fileName || !fileType) {
-      return res.status(400).json({ message: 'Имя файла и тип обязательны' });
-    }
-
-    const key = `logos-ai/companies/${companyName}/files/${Date.now()}-${fileName}`;
-    
-    const command = new PutObjectCommand({
-      Bucket: process.env.YANDEX_BUCKET_NAME,
-      Key: key,
-      ContentType: fileType,
-      Metadata: {
-        'company-name': companyName,
-        'user-id': req.user.id.toString(),
-        'file-type': 'general'
-      }
-    });
-
-    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 час
-
-    res.json({
-      uploadUrl: presignedUrl,
-      fileUrl: `https://storage.yandexcloud.net/${process.env.YANDEX_BUCKET_NAME}/${key}`,
-      key: key
-    });
-  } catch (error) {
-    console.error('Error generating file upload URL:', error);
-    res.status(500).json({ message: 'Ошибка генерации ссылки для загрузки' });
-  }
-});
-
-// Генерация presigned URL для скачивания файла
-router.post('/download-url', auth, async (req, res) => {
-  try {
-    const { fileUrl } = req.body;
-    
-    if (!fileUrl) {
-      return res.status(400).json({ message: 'URL файла обязателен' });
-    }
-
-    // Извлекаем ключ из URL
-    const urlParts = fileUrl.split('/');
-    const key = urlParts.slice(-2).join('/'); // Берем последние 2 части пути
-    
-    const command = new GetObjectCommand({
-      Bucket: process.env.YANDEX_BUCKET_NAME,
-      Key: key
-    });
-
-    const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 час
-
-    res.json({ downloadUrl: presignedUrl });
-  } catch (error) {
-    console.error('Error generating download URL:', error);
-    res.status(500).json({ message: 'Ошибка генерации ссылки для скачивания' });
-  }
 });
 
 // Загрузка файла
@@ -234,32 +95,6 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// Сохранение информации о файле в базе данных (для прямой загрузки)
-router.post('/save-file', auth, async (req, res) => {
-  try {
-    console.log('Save file request from user:', req.user);
-    
-    const { original_name, file_url } = req.body;
-    const companyName = req.user.companyName;
-    
-    if (!original_name || !file_url) {
-      return res.status(400).json({ message: 'Имя файла и URL обязательны' });
-    }
-    
-    console.log('Saving file:', { original_name, file_url, companyName });
-    
-    const connection = await DatabaseService.getCompanyConnection(companyName);
-    await connection.query(
-      'INSERT INTO uploaded_files (original_name, file_url, uploaded_by) VALUES ($1, $2, $3)',
-      [original_name, file_url, req.user.id]
-    );
-    
-    console.log('File saved to database');
-    res.json({ message: 'Файл сохранен', file_url });
-  } catch (error) {
-    console.error('File save error:', error);
-    res.status(500).json({ message: 'Ошибка сохранения файла' });
-  }
-});
+
 
 module.exports = router;
