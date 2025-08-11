@@ -11,6 +11,16 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const multerS3 = require('multer-s3');
 
+// Настройка S3 клиента для Яндекс.Облако
+const s3Client = new S3Client({
+  region: 'ru-central1',
+  endpoint: 'https://storage.yandexcloud.net',
+  credentials: {
+    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
+    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
+  }
+});
+
 // Простое хранилище S3 для файлов
 const fileStorage = multerS3({
   s3: s3Client,
@@ -25,16 +35,6 @@ const fileStorage = multerS3({
 const upload = multer({ 
   storage: fileStorage,
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB
-});
-
-// Настройка S3 клиента для Яндекс.Облако
-const s3Client = new S3Client({
-  region: 'ru-central1',
-  endpoint: 'https://storage.yandexcloud.net',
-  credentials: {
-    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
-    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
-  }
 });
 
 // Генерация presigned URL для загрузки аватара
