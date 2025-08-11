@@ -48,7 +48,7 @@ exports.register = async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Handle avatar upload (Yandex Cloud S3)
+    // Handle avatar upload (S3)
     let avatarUrl = null;
     if (req.file) {
       avatarUrl = req.file.location; // S3 возвращает URL в location

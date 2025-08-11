@@ -17,24 +17,18 @@ const s3Client = new S3Client({
   }
 });
 
-// Функция для создания хранилища отчетов с динамической папкой компании
-const createReportStorage = (companyName) => {
-  return multerS3({
-    s3: s3Client,
-    bucket: process.env.YANDEX_BUCKET_NAME,
-    key: (req, file, cb) => {
-      const fileName = `logos-ai/companies/${companyName}/reports/${Date.now()}-${file.originalname}`;
-      cb(null, fileName);
-    },
-    contentType: (req, file, cb) => {
-      cb(null, file.mimetype);
-    }
-  });
-};
+// Простое хранилище S3 для отчетов
+const reportStorage = multerS3({
+  s3: s3Client,
+  bucket: process.env.YANDEX_BUCKET_NAME,
+  key: (req, file, cb) => {
+    const companyName = req.user?.companyName || 'general';
+    const fileName = `uploads/companies/${companyName}/reports/${Date.now()}-${file.originalname}`;
+    cb(null, fileName);
+  }
+});
 
-const createReportUpload = (companyName) => {
-  return multer({ storage: createReportStorage(companyName) });
-};
+const reportUpload = multer({ storage: reportStorage });
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -49,11 +43,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-router.post('/upload', combinedAuth, (req, res, next) => {
-  const companyName = req.body.companyName || req.user.companyName || 'general';
-  const upload = createReportUpload(companyName);
-  upload.single('report')(req, res, next);
-}, async (req, res) => {
+router.post('/upload', combinedAuth, reportUpload.single('report'), async (req, res) => {
   try {
     console.log('Upload request from user:', req.user);
     
@@ -75,9 +65,9 @@ router.post('/upload', combinedAuth, (req, res, next) => {
     console.log('Company name from request:', companyName);
     console.log('File uploaded:', req.file.originalname);
     
-    // Yandex Cloud S3 возвращает URL файла
+    // S3 возвращает URL файла
     const file_url = req.file.location;
-    console.log('Yandex Cloud S3 file URL:', file_url);
+    console.log('S3 file URL:', file_url);
     
     const connection = await DatabaseService.getCompanyConnection(companyName);
     await connection.query(

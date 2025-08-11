@@ -8,9 +8,33 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const upload = multer({
-  dest: path.join(__dirname, '../../uploads/avatars'),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+const { S3Client } = require('@aws-sdk/client-s3');
+const multerS3 = require('multer-s3');
+
+// Настройка S3 клиента для Яндекс.Облако
+const s3Client = new S3Client({
+  region: 'ru-central1',
+  endpoint: 'https://storage.yandexcloud.net',
+  credentials: {
+    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
+    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
+  }
+});
+
+// Простое хранилище S3 для аватаров
+const avatarStorage = multerS3({
+  s3: s3Client,
+  bucket: process.env.YANDEX_BUCKET_NAME,
+  key: (req, file, cb) => {
+    const companyName = req.user?.companyName || 'general';
+    const fileName = `uploads/companies/${companyName}/avatars/${Date.now()}-${file.originalname}`;
+    cb(null, fileName);
+  }
+});
+
+const upload = multer({ 
+  storage: avatarStorage,
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB
 });
 
 router.get('/profile', auth, async (req, res) => {
@@ -78,6 +102,25 @@ router.post('/set-password', auth, async (req, res) => {
   } catch (error) {
     console.error('Set password error:', error);
     res.status(500).json({ message: 'Ошибка при установке пароля' });
+  }
+});
+
+// Загрузка аватара через multer
+router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });
+    
+    const avatarUrl = req.file.location; // S3 возвращает URL в location
+    const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
+    await connection.query(
+      'UPDATE user_auth SET avatar_url = $1 WHERE id = $2',
+      [avatarUrl, req.user.id]
+    );
+    
+    res.json({ avatarUrl });
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    res.status(500).json({ message: 'Ошибка при загрузке аватара' });
   }
 });
 

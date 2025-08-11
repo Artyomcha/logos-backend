@@ -9,26 +9,22 @@ const combinedAuth = require('../middleware/combinedAuth');
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-// Динамическая настройка multer для загрузки в компанейские папки
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const companyName = req.user.companyName || 'general';
-    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'files');
-    // Создаем папку если не существует
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+const multerS3 = require('multer-s3');
+
+// Простое хранилище S3 для файлов
+const fileStorage = multerS3({
+  s3: s3Client,
+  bucket: process.env.YANDEX_BUCKET_NAME,
+  key: (req, file, cb) => {
+    const companyName = req.user?.companyName || 'general';
+    const fileName = `uploads/companies/${companyName}/files/${Date.now()}-${file.originalname}`;
+    cb(null, fileName);
   }
 });
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+const upload = multer({ 
+  storage: fileStorage,
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
 });
 
 // Настройка S3 клиента для Яндекс.Облако
@@ -242,6 +238,34 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) {
     console.error('Error deleting file:', error);
     res.status(500).json({ message: 'Ошибка удаления файла' });
+  }
+});
+
+// Сохранение информации о файле в базе данных (для прямой загрузки)
+router.post('/save-file', auth, async (req, res) => {
+  try {
+    console.log('Save file request from user:', req.user);
+    
+    const { original_name, file_url } = req.body;
+    const companyName = req.user.companyName;
+    
+    if (!original_name || !file_url) {
+      return res.status(400).json({ message: 'Имя файла и URL обязательны' });
+    }
+    
+    console.log('Saving file:', { original_name, file_url, companyName });
+    
+    const connection = await DatabaseService.getCompanyConnection(companyName);
+    await connection.query(
+      'INSERT INTO uploaded_files (original_name, file_url, uploaded_by) VALUES ($1, $2, $3)',
+      [original_name, file_url, req.user.id]
+    );
+    
+    console.log('File saved to database');
+    res.json({ message: 'Файл сохранен', file_url });
+  } catch (error) {
+    console.error('File save error:', error);
+    res.status(500).json({ message: 'Ошибка сохранения файла' });
   }
 });
 

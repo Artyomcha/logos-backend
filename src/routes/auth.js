@@ -15,68 +15,20 @@ const s3Client = new S3Client({
   }
 });
 
-// Функция для создания хранилища с динамической папкой компании
-const createAvatarStorage = (companyName) => {
-  return multerS3({
-    s3: s3Client,
-    bucket: process.env.YANDEX_BUCKET_NAME,
-    key: (req, file, cb) => {
-      const fileName = `logos-ai/companies/${companyName}/avatars/${Date.now()}-${file.originalname}`;
-      cb(null, fileName);
-    },
-    contentType: (req, file, cb) => {
-      cb(null, file.mimetype);
-    }
-  });
-};
+// Простое хранилище S3 для аватаров
+const avatarStorage = multerS3({
+  s3: s3Client,
+  bucket: process.env.YANDEX_BUCKET_NAME,
+  key: (req, file, cb) => {
+    const companyName = req.body.companyName || 'general';
+    const fileName = `uploads/companies/${companyName}/avatars/${Date.now()}-${file.originalname}`;
+    cb(null, fileName);
+  }
+});
 
-const createReportStorage = (companyName) => {
-  return multerS3({
-    s3: s3Client,
-    bucket: process.env.YANDEX_BUCKET_NAME,
-    key: (req, file, cb) => {
-      const fileName = `logos-ai/companies/${companyName}/reports/${Date.now()}-${file.originalname}`;
-      cb(null, fileName);
-    },
-    contentType: (req, file, cb) => {
-      cb(null, file.mimetype);
-    }
-  });
-};
+const avatarUpload = multer({ storage: avatarStorage });
 
-const createFileStorage = (companyName) => {
-  return multerS3({
-    s3: s3Client,
-    bucket: process.env.YANDEX_BUCKET_NAME,
-    key: (req, file, cb) => {
-      const fileName = `logos-ai/companies/${companyName}/files/${Date.now()}-${file.originalname}`;
-      cb(null, fileName);
-    },
-    contentType: (req, file, cb) => {
-      cb(null, file.mimetype);
-    }
-  });
-};
-
-// Middleware для создания динамического multer с папкой компании
-const createAvatarUpload = (companyName) => {
-  return multer({ storage: createAvatarStorage(companyName) });
-};
-
-const createReportUpload = (companyName) => {
-  return multer({ storage: createReportStorage(companyName) });
-};
-
-const createFileUpload = (companyName) => {
-  return multer({ storage: createFileStorage(companyName) });
-};
-
-// Динамический маршрут для регистрации с папкой компании
-router.post('/register', (req, res, next) => {
-  const companyName = req.body.companyName || 'general';
-  const upload = createAvatarUpload(companyName);
-  upload.single('avatar')(req, res, next);
-}, authController.register);
+router.post('/register', avatarUpload.single('avatar'), authController.register);
 router.post('/user-companies', authController.getUserCompanies);
 router.post('/login', authController.login);
 router.post('/verify-2fa', authController.verify2FA);
