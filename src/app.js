@@ -21,30 +21,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve company-specific static files with proper routing
-app.use('/uploads/companies/:company/avatars', (req, res, next) => {
-  const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'avatars');
-  const staticMiddleware = express.static(filePath);
-  staticMiddleware(req, res, next);
-});
-
-app.use('/uploads/companies/:company/reports', (req, res, next) => {
-  const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'reports');
-  const staticMiddleware = express.static(filePath);
-  staticMiddleware(req, res, next);
-});
-
-app.use('/uploads/companies/:company/files', (req, res, next) => {
-  const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'files');
-  const staticMiddleware = express.static(filePath);
-  staticMiddleware(req, res, next);
-});
-
-// Legacy static file serving (for backward compatibility)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Cloudinary handles file serving - no need for static file serving
 
 // API routes
 app.use('/api/auth', authRoutes);

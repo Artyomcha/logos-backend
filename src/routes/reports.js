@@ -4,13 +4,37 @@ const DatabaseService = require('../services/databaseService');
 const auth = require('../middleware/auth');
 const combinedAuth = require('../middleware/combinedAuth');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { S3Client } = require('@aws-sdk/client-s3');
+const multerS3 = require('multer-s3');
 
-const upload = multer({
-  dest: path.join(__dirname, '../../uploads/reports'),
-  limits: { fileSize: 10 * 1024 * 1024 },
+// Настройка S3 клиента для Яндекс.Облако
+const s3Client = new S3Client({
+  region: 'ru-central1',
+  endpoint: 'https://storage.yandexcloud.net',
+  credentials: {
+    accessKeyId: process.env.YANDEX_ACCESS_KEY_ID,
+    secretAccessKey: process.env.YANDEX_SECRET_ACCESS_KEY
+  }
 });
+
+// Функция для создания хранилища отчетов с динамической папкой компании
+const createReportStorage = (companyName) => {
+  return multerS3({
+    s3: s3Client,
+    bucket: process.env.YANDEX_BUCKET_NAME,
+    key: (req, file, cb) => {
+      const fileName = `logos-ai/companies/${companyName}/reports/${Date.now()}-${file.originalname}`;
+      cb(null, fileName);
+    },
+    contentType: (req, file, cb) => {
+      cb(null, file.mimetype);
+    }
+  });
+};
+
+const createReportUpload = (companyName) => {
+  return multer({ storage: createReportStorage(companyName) });
+};
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -25,7 +49,11 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-router.post('/upload', combinedAuth, upload.single('report'), async (req, res) => {
+router.post('/upload', combinedAuth, (req, res, next) => {
+  const companyName = req.body.companyName || req.user.companyName || 'general';
+  const upload = createReportUpload(companyName);
+  upload.single('report')(req, res, next);
+}, async (req, res) => {
   try {
     console.log('Upload request from user:', req.user);
     
@@ -47,23 +75,9 @@ router.post('/upload', combinedAuth, upload.single('report'), async (req, res) =
     console.log('Company name from request:', companyName);
     console.log('File uploaded:', req.file.originalname);
     
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const newName = `report_${Date.now()}${ext}`;
-    const companyReportsDir = path.join(__dirname, '../../uploads/companies', companyName, 'reports');
-    
-    console.log('Company reports directory:', companyReportsDir);
-    
-    if (!fs.existsSync(companyReportsDir)) {
-      console.log('Creating directory:', companyReportsDir);
-      fs.mkdirSync(companyReportsDir, { recursive: true });
-    }
-    
-    const newPath = path.join(companyReportsDir, newName);
-    console.log('Moving file to:', newPath);
-    fs.renameSync(req.file.path, newPath);
-    
-    const file_url = `/uploads/companies/${companyName}/reports/${newName}`;
-    console.log('File URL:', file_url);
+    // Yandex Cloud S3 возвращает URL файла
+    const file_url = req.file.location;
+    console.log('Yandex Cloud S3 file URL:', file_url);
     
     const connection = await DatabaseService.getCompanyConnection(companyName);
     await connection.query(
@@ -76,6 +90,36 @@ router.post('/upload', combinedAuth, upload.single('report'), async (req, res) =
   } catch (error) {
     console.error('Report upload error:', error);
     res.status(500).json({ message: 'Ошибка загрузки отчёта' });
+  }
+});
+
+// Сохранение информации об отчете в базе данных (для прямой загрузки)
+router.post('/save-report', auth, async (req, res) => {
+  try {
+    console.log('Save report request from user:', req.user);
+    
+    if (req.user.role !== 'manager') return res.status(403).json({ message: 'Нет доступа' });
+    
+    const { title, report_date, file_url } = req.body;
+    const companyName = req.user.companyName;
+    
+    if (!title || !file_url) {
+      return res.status(400).json({ message: 'Название и URL файла обязательны' });
+    }
+    
+    console.log('Saving report:', { title, report_date, file_url, companyName });
+    
+    const connection = await DatabaseService.getCompanyConnection(companyName);
+    await connection.query(
+      'INSERT INTO departament_report (title, file_url, report_date, created_by) VALUES ($1, $2, $3, $4)',
+      [title, file_url, report_date, req.user.id]
+    );
+    
+    console.log('Report saved to database');
+    res.json({ message: 'Отчёт сохранен', file_url });
+  } catch (error) {
+    console.error('Report save error:', error);
+    res.status(500).json({ message: 'Ошибка сохранения отчёта' });
   }
 });
 

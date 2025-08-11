@@ -81,22 +81,15 @@ router.post('/set-password', auth, async (req, res) => {
   }
 });
 
-router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+// Обновление аватара пользователя (для прямой загрузки)
+router.patch('/update-avatar', auth, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });
+    const { avatarUrl } = req.body;
     
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const newName = `avatar_${Date.now()}${ext}`;
-    const companyAvatarDir = path.join(__dirname, '../../uploads/companies', req.user.companyName, 'avatars');
-    
-    if (!fs.existsSync(companyAvatarDir)) {
-      fs.mkdirSync(companyAvatarDir, { recursive: true });
+    if (!avatarUrl) {
+      return res.status(400).json({ message: 'URL аватара обязателен' });
     }
     
-    const newPath = path.join(companyAvatarDir, newName);
-    fs.renameSync(req.file.path, newPath);
-    
-    const avatarUrl = `/uploads/companies/${req.user.companyName}/avatars/${newName}`;
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     await connection.query(
       'UPDATE user_auth SET avatar_url = $1 WHERE id = $2',
