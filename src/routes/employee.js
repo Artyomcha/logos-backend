@@ -288,7 +288,8 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
       full_dialogue, 
       companyName, 
       userId, 
-      grade
+      grade,
+      report
     } = req.body;
     
     console.log('Universal audio upload request for userId:', userId, 'companyName from body:', companyName);
@@ -353,7 +354,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
           task_name, 
           grade || 0, 
           finalUserId,
-          full_dialogue || ''
+          report || ''
         ]);
         console.log('Created task record in overall_data:', task_name);
       } else {
@@ -366,7 +367,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
         await pool.query(updateTaskQuery, [
           grade || 0, 
           finalUserId,
-          full_dialogue || '',
+          report || '',
           task_name
         ]);
         console.log('Updated task record in overall_data:', task_name);
