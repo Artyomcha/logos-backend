@@ -90,6 +90,7 @@ const getCompanyDatabase = async (req, res, next) => {
     // Формируем имя базы данных
     const databaseName = `logos_ai_${companyName}`;
     req.companyDatabase = databaseName;
+    req.companyName = companyName; // Добавляем companyName в req для использования в универсальной загрузке
     console.log('Company database name:', databaseName);
     
     next();
@@ -285,7 +286,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     const { task_name, full_dialogue, companyName, userId } = req.body;
     
     console.log('Universal audio upload request for userId:', userId, 'companyName from body:', companyName);
-    console.log('Company name from header:', req.headers['x-company-name']);
+    console.log('Company name from middleware:', req.companyName);
     console.log('Company name from user object:', req.user?.companyName);
     
     if (!req.file) {
@@ -294,11 +295,17 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     
     console.log('Audio file received:', req.file.originalname);
     
-    // Определяем компанию - приоритет у заголовка X-Company-Name, затем у поля формы, затем у токена
-    const finalCompanyName = req.headers['x-company-name'] || companyName || req.user?.companyName;
+    // Определяем компанию - приоритет у middleware, затем у тела запроса
+    const finalCompanyName = req.companyName || companyName || req.user?.companyName;
+    
     if (!finalCompanyName) {
       return res.status(400).json({ 
-        message: 'Не указана компания. Используйте заголовок X-Company-Name или поле companyName в форме' 
+        message: 'Не указана компания. Используйте заголовок X-Company-Name или поле companyName в форме',
+        debug: {
+          middlewareCompany: req.companyName,
+          bodyCompany: companyName,
+          userCompany: req.user?.companyName
+        }
       });
     }
     

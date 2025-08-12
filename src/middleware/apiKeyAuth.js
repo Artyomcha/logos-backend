@@ -16,9 +16,15 @@ async function apiKeyAuthMiddleware(req, res, next) {
   // Проверяем постоянный токен
   if (apiKey === PERMANENT_API_KEY) {
     // Получаем название компании из заголовка или query параметра (если есть)
-    const companyName = req.headers['x-company-name'] || req.query.companyName;
+    let companyName = req.headers['x-company-name'] || req.query.companyName;
+    
+    // Проверяем разные варианты заголовка
+    if (!companyName) {
+      companyName = req.headers['X-Company-Name'] || req.headers['x-company-name'];
+    }
     
     console.log('Permanent API key verified, company from header/query:', companyName);
+    console.log('All headers:', req.headers);
     
     // Устанавливаем данные пользователя для совместимости с существующим кодом
     req.user = {
@@ -27,6 +33,9 @@ async function apiKeyAuthMiddleware(req, res, next) {
       companyName: companyName, // Может быть undefined
       apiKey: true
     };
+    
+    // Также сохраняем компанию в req для доступа в маршруте
+    req.companyName = companyName;
     
     next();
   } else {
