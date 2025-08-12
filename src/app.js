@@ -43,6 +43,13 @@ app.use('/uploads/companies/:company/files', (req, res, next) => {
   staticMiddleware(req, res, next);
 });
 
+app.use('/uploads/companies/:company/calls', (req, res, next) => {
+  const companyName = req.params.company;
+  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'calls');
+  const staticMiddleware = express.static(filePath);
+  staticMiddleware(req, res, next);
+});
+
 // Legacy static file serving (for backward compatibility)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

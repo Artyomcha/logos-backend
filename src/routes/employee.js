@@ -2,6 +2,41 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { Pool } = require('pg');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Настройка multer для аудио файлов
+const audioStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const companyName = req.user?.companyName || 'general';
+    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const callId = req.params.callId || 'unknown';
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `call_${callId}${ext}`);
+  }
+});
+
+const uploadAudio = multer({ 
+  storage: audioStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB для аудио
+  fileFilter: function (req, file, cb) {
+    // Разрешаем только аудио файлы
+    const allowedTypes = ['.wav', '.mp3', '.m4a', '.aac', '.ogg'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только аудио файлы разрешены'), false);
+    }
+  }
+});
 
 // Middleware для получения базы данных компании из токена
 const getCompanyDatabase = async (req, res, next) => {
@@ -138,6 +173,74 @@ router.get('/calls/:callId', auth, getCompanyDatabase, async (req, res) => {
   } catch (error) {
     console.error('Error fetching call details:', error);
     res.status(500).json({ error: 'Ошибка получения деталей звонка' });
+  }
+});
+
+// Загрузка аудио файла для звонка
+router.post('/calls/:callId/audio', auth, getCompanyDatabase, uploadAudio.single('audio'), async (req, res) => {
+  try {
+    const { callId } = req.params;
+    const userId = req.user.id;
+    
+    console.log('Audio upload request for call ID:', callId, 'userId:', userId);
+    
+    if (!req.file) {
+      return res.status(400).json({ message: 'Аудио файл не загружен' });
+    }
+    
+    console.log('Audio file received:', req.file.originalname);
+    
+    // Формируем URL для аудио файла
+    const audioUrl = `/uploads/companies/${req.user.companyName}/calls/${req.file.filename}`;
+    console.log('Audio URL:', audioUrl);
+    
+    // Подключаемся к базе данных компании
+    const pool = new Pool({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: req.companyDatabase,
+    });
+    
+    // Проверяем, что звонок существует и принадлежит пользователю
+    const checkQuery = `
+      SELECT d.id FROM dialogues d
+      LEFT JOIN employees e ON d.user_id = e.id
+      WHERE e.user_id = $1 AND d.id = $2
+    `;
+    
+    const checkResult = await pool.query(checkQuery, [userId, callId]);
+    
+    if (checkResult.rows.length === 0) {
+      await pool.end();
+      return res.status(404).json({ message: 'Звонок не найден или у вас нет доступа к нему' });
+    }
+    
+    // Обновляем запись в таблице dialogues
+    const updateQuery = `
+      UPDATE dialogues 
+      SET audio_file_url = $1 
+      WHERE id = $2
+    `;
+    
+    await pool.query(updateQuery, [audioUrl, callId]);
+    await pool.end();
+    
+    console.log('Audio file URL saved to database for call ID:', callId);
+    
+    res.json({ 
+      message: 'Аудио файл успешно загружен',
+      audio_url: audioUrl,
+      call_id: callId
+    });
+    
+  } catch (error) {
+    console.error('Error uploading audio file:', error);
+    res.status(500).json({ 
+      message: 'Ошибка при загрузке аудио файла',
+      error: error.message 
+    });
   }
 });
 
