@@ -36,7 +36,7 @@ async function sendLoginCredentials(to, email, password, companyName, firstName,
       subject: 'Ваши данные для входа в систему',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: rgba(44, 42, 66, 0.5);">Добро пожаловать в систему!</h2>
+          <h2 style="color: rgb(44, 42, 66);">Добро пожаловать в систему!</h2>
           <p>Здравствуйте, ${firstName} ${lastName}!</p>
           <p>Ваш аккаунт был успешно создан администратором. Используйте следующие данные для входа в систему:</p>
           
@@ -88,7 +88,7 @@ async function sendPasswordResetCode(to, code) {
       subject: 'Код для сброса пароля',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: rgba(44, 42, 66, 0.5);">Сброс пароля</h2>
+          <h2 style="color: rgb(44, 42, 66);">Сброс пароля</h2>
           <p>Вы запросили сброс пароля для вашего аккаунта.</p>
           <p>Используйте следующий код для подтверждения:</p>
           
