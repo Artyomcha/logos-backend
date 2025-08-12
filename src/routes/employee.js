@@ -283,7 +283,15 @@ router.post('/calls/:callId/audio', auth, getCompanyDatabase, uploadAudio.single
 // Универсальная загрузка аудио файла (автоматически создает запись в dialogues)
 router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'), async (req, res) => {
   try {
-    const { task_name, full_dialogue, companyName, userId } = req.body;
+    const { 
+      task_name, 
+      full_dialogue, 
+      companyName, 
+      userId, 
+      grade,
+      report_title,
+      report_date
+    } = req.body;
     
     console.log('Universal audio upload request for userId:', userId, 'companyName from body:', companyName);
     console.log('Company name from middleware:', req.companyName);
@@ -331,6 +339,60 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
       database: databaseName,
     });
     
+    // Если передан task_name, создаем/обновляем запись в overall_data со всеми полями
+    if (task_name) {
+      // Проверяем, существует ли task_name в overall_data
+      const checkTaskQuery = 'SELECT task_name FROM overall_data WHERE task_name = $1';
+      const taskResult = await pool.query(checkTaskQuery, [task_name]);
+      
+      if (taskResult.rows.length === 0) {
+        // Создаем запись в overall_data с реальными полями
+        const insertTaskQuery = `
+          INSERT INTO overall_data (task_name, grade, user_id, report)
+          VALUES ($1, $2, $3, $4)
+        `;
+        await pool.query(insertTaskQuery, [
+          task_name, 
+          grade || 0, 
+          finalUserId,
+          full_dialogue || ''
+        ]);
+        console.log('Created task record in overall_data:', task_name);
+      } else {
+        // Обновляем существующую запись с реальными полями
+        const updateTaskQuery = `
+          UPDATE overall_data 
+          SET grade = $1, user_id = $2, report = $3
+          WHERE task_name = $4
+        `;
+        await pool.query(updateTaskQuery, [
+          grade || 0, 
+          finalUserId,
+          full_dialogue || '',
+          task_name
+        ]);
+        console.log('Updated task record in overall_data:', task_name);
+      }
+    }
+    
+    // Если передан report_title, создаем запись в departament_report
+    if (report_title) {
+      const reportUrl = `/uploads/companies/${finalCompanyName}/reports/${req.file.filename}`;
+      const insertReportQuery = `
+        INSERT INTO departament_report (title, file_url, report_date, uploaded_by, company_name)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `;
+      const reportResult = await pool.query(insertReportQuery, [
+        report_title,
+        reportUrl,
+        report_date || new Date().toISOString().split('T')[0],
+        finalUserId,
+        finalCompanyName
+      ]);
+      console.log('Created report record with ID:', reportResult.rows[0].id);
+    }
+    
     // Создаем новую запись в таблице dialogues
     let insertQuery, queryParams;
     
@@ -360,12 +422,14 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     console.log('New call record created with ID:', newCallId, 'in company:', finalCompanyName, 'for user:', finalUserId);
     
     res.json({ 
-      message: 'Аудио файл успешно загружен',
+      message: 'Аудио файл и данные успешно загружены',
       audio_url: audioUrl,
       call_id: newCallId,
       task_name: task_name || null,
       company_name: finalCompanyName,
-      user_id: finalUserId
+      user_id: finalUserId,
+      grade: grade || 0,
+      report_title: report_title || null
     });
     
   } catch (error) {
