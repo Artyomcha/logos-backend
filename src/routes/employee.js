@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const combinedAuth = require('../middleware/combinedAuth');
 const { Pool } = require('pg');
 const multer = require('multer');
 const path = require('path');
@@ -279,10 +280,9 @@ router.post('/calls/:callId/audio', auth, getCompanyDatabase, uploadAudio.single
 });
 
 // Универсальная загрузка аудио файла (автоматически создает запись в dialogues)
-router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.single('audio'), async (req, res) => {
+router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'), async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { task_name, full_dialogue, companyName } = req.body;
+    const { task_name, full_dialogue, companyName, userId } = req.body;
     
     console.log('Universal audio upload request for userId:', userId, 'companyName:', companyName);
     
@@ -293,10 +293,13 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
     console.log('Audio file received:', req.file.originalname);
     
     // Определяем компанию - приоритет у переданного companyName, затем у токена
-    const finalCompanyName = companyName || req.user.companyName;
+    const finalCompanyName = companyName || req.user?.companyName;
     if (!finalCompanyName) {
       return res.status(400).json({ message: 'Не указана компания' });
     }
+    
+    // Определяем userId - приоритет у переданного userId, затем у токена
+    const finalUserId = userId || req.user?.id || 1; // По умолчанию ID 1
     
     // Формируем URL для аудио файла
     const audioUrl = `/uploads/companies/${finalCompanyName}/calls/${req.file.filename}`;
@@ -322,7 +325,7 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
     `;
     
     const result = await pool.query(insertQuery, [
-      userId, 
+      finalUserId, 
       task_name || 'Новый звонок', 
       full_dialogue || '', 
       audioUrl
@@ -331,14 +334,15 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
     const newCallId = result.rows[0].id;
     await pool.end();
     
-    console.log('New call record created with ID:', newCallId, 'in company:', finalCompanyName);
+    console.log('New call record created with ID:', newCallId, 'in company:', finalCompanyName, 'for user:', finalUserId);
     
     res.json({ 
       message: 'Аудио файл успешно загружен',
       audio_url: audioUrl,
       call_id: newCallId,
       task_name: task_name || 'Новый звонок',
-      company_name: finalCompanyName
+      company_name: finalCompanyName,
+      user_id: finalUserId
     });
     
   } catch (error) {
