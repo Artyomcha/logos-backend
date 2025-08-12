@@ -15,13 +15,13 @@ async function apiKeyAuthMiddleware(req, res, next) {
   
   // Проверяем постоянный токен
   if (apiKey === PERMANENT_API_KEY) {
-    // Получаем название компании из заголовка, query параметра или тела запроса
-    const companyName = req.headers['x-company-name'] || req.query.companyName || req.body.companyName;
+    // Получаем название компании из заголовка или query параметра (req.body может быть недоступен)
+    const companyName = req.headers['x-company-name'] || req.query.companyName;
     
     if (!companyName) {
-      console.log('No company name provided in headers, query, or body');
+      console.log('No company name provided in headers or query');
       return res.status(400).json({ 
-        message: 'Название компании обязательно. Используйте заголовок X-Company-Name, query параметр companyName или поле companyName в теле запроса' 
+        message: 'Название компании обязательно. Используйте заголовок X-Company-Name или query параметр companyName' 
       });
     }
     
