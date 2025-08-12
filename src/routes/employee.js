@@ -198,13 +198,19 @@ router.get('/calls/:callId', auth, getCompanyDatabase, async (req, res) => {
       ];
     }
     
+    // Формируем полный URL для аудио
+    const audioUrl = callData.audio_file_url ? 
+      `https://logos-backend-production.up.railway.app${callData.audio_file_url}` : 
+      null;
+    
     res.json({
       id: callData.id,
       recorded_at: callData.recorded_at,
       customer_name: callData.customer_name,
       overall_score: callData.overall_score,
       transcript: transcript,
-      audio_url: callData.audio_file_url || `/uploads/companies/${req.user.companyName}/calls/call_${callId}.wav`
+      audio_url: audioUrl,
+      audio_duration: null // Будет заполнено на фронтенде
     });
   } catch (error) {
     console.error('Error fetching call details:', error);
