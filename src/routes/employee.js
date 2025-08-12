@@ -284,7 +284,9 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
   try {
     const { task_name, full_dialogue, companyName, userId } = req.body;
     
-    console.log('Universal audio upload request for userId:', userId, 'companyName:', companyName);
+    console.log('Universal audio upload request for userId:', userId, 'companyName from body:', companyName);
+    console.log('Company name from header:', req.headers['x-company-name']);
+    console.log('Company name from user object:', req.user?.companyName);
     
     if (!req.file) {
       return res.status(400).json({ message: 'Аудио файл не загружен' });
@@ -295,8 +297,12 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     // Определяем компанию - приоритет у заголовка X-Company-Name, затем у поля формы, затем у токена
     const finalCompanyName = req.headers['x-company-name'] || companyName || req.user?.companyName;
     if (!finalCompanyName) {
-      return res.status(400).json({ message: 'Не указана компания. Используйте заголовок X-Company-Name или поле companyName в форме' });
+      return res.status(400).json({ 
+        message: 'Не указана компания. Используйте заголовок X-Company-Name или поле companyName в форме' 
+      });
     }
+    
+    console.log('Final company name determined:', finalCompanyName);
     
     // Определяем userId - приоритет у переданного userId, затем у токена
     const finalUserId = userId || req.user?.id || 1; // По умолчанию ID 1
@@ -307,6 +313,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     
     // Формируем имя базы данных компании
     const databaseName = `logos_ai_${finalCompanyName}`;
+    console.log('Database name:', databaseName);
     
     // Подключаемся к базе данных компании
     const pool = new Pool({
