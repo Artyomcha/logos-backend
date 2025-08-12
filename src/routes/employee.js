@@ -26,7 +26,8 @@ const audioStorage = multer.diskStorage({
 // Настройка multer для универсальной загрузки аудио
 const universalAudioStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const companyName = req.user?.companyName || 'general';
+    // Определяем компанию - приоритет у переданного companyName, затем у токена
+    const companyName = req.body.companyName || req.user?.companyName || 'general';
     const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -281,9 +282,9 @@ router.post('/calls/:callId/audio', auth, getCompanyDatabase, uploadAudio.single
 router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.single('audio'), async (req, res) => {
   try {
     const userId = req.user.id;
-    const { task_name, full_dialogue } = req.body;
+    const { task_name, full_dialogue, companyName } = req.body;
     
-    console.log('Universal audio upload request for userId:', userId);
+    console.log('Universal audio upload request for userId:', userId, 'companyName:', companyName);
     
     if (!req.file) {
       return res.status(400).json({ message: 'Аудио файл не загружен' });
@@ -291,9 +292,18 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
     
     console.log('Audio file received:', req.file.originalname);
     
+    // Определяем компанию - приоритет у переданного companyName, затем у токена
+    const finalCompanyName = companyName || req.user.companyName;
+    if (!finalCompanyName) {
+      return res.status(400).json({ message: 'Не указана компания' });
+    }
+    
     // Формируем URL для аудио файла
-    const audioUrl = `/uploads/companies/${req.user.companyName}/calls/${req.file.filename}`;
+    const audioUrl = `/uploads/companies/${finalCompanyName}/calls/${req.file.filename}`;
     console.log('Audio URL:', audioUrl);
+    
+    // Формируем имя базы данных компании
+    const databaseName = `logos_ai_${finalCompanyName}`;
     
     // Подключаемся к базе данных компании
     const pool = new Pool({
@@ -301,7 +311,7 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
       port: process.env.DB_PORT,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
-      database: req.companyDatabase,
+      database: databaseName,
     });
     
     // Создаем новую запись в таблице dialogues
@@ -321,13 +331,14 @@ router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.sing
     const newCallId = result.rows[0].id;
     await pool.end();
     
-    console.log('New call record created with ID:', newCallId);
+    console.log('New call record created with ID:', newCallId, 'in company:', finalCompanyName);
     
     res.json({ 
       message: 'Аудио файл успешно загружен',
       audio_url: audioUrl,
       call_id: newCallId,
-      task_name: task_name || 'Новый звонок'
+      task_name: task_name || 'Новый звонок',
+      company_name: finalCompanyName
     });
     
   } catch (error) {
