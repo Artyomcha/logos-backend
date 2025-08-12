@@ -331,19 +331,45 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
       database: databaseName,
     });
     
-    // Создаем новую запись в таблице dialogues
-    const insertQuery = `
-      INSERT INTO dialogues (user_id, task_name, full_dialogue, audio_file_url, recorded_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING id
-    `;
+    // Если передан task_name, проверяем/создаем запись в overall_data
+    if (task_name) {
+      // Проверяем, существует ли task_name в overall_data
+      const checkTaskQuery = 'SELECT task_name FROM overall_data WHERE task_name = $1';
+      const taskResult = await pool.query(checkTaskQuery, [task_name]);
+      
+      if (taskResult.rows.length === 0) {
+        // Создаем запись в overall_data
+        const insertTaskQuery = `
+          INSERT INTO overall_data (task_name, grade)
+          VALUES ($1, 0)
+        `;
+        await pool.query(insertTaskQuery, [task_name]);
+        console.log('Created task record in overall_data:', task_name);
+      }
+    }
     
-    const result = await pool.query(insertQuery, [
-      finalUserId, 
-      task_name || null,
-      full_dialogue || '', 
-      audioUrl
-    ]);
+    // Создаем новую запись в таблице dialogues
+    let insertQuery, queryParams;
+    
+    if (task_name) {
+      // Если task_name передан, включаем его в запрос
+      insertQuery = `
+        INSERT INTO dialogues (user_id, task_name, full_dialogue, audio_file_url, recorded_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        RETURNING id
+      `;
+      queryParams = [finalUserId, task_name, full_dialogue || '', audioUrl];
+    } else {
+      // Если task_name не передан, не включаем его в запрос
+      insertQuery = `
+        INSERT INTO dialogues (user_id, full_dialogue, audio_file_url, recorded_at)
+        VALUES ($1, $2, $3, NOW())
+        RETURNING id
+      `;
+      queryParams = [finalUserId, full_dialogue || '', audioUrl];
+    }
+    
+    const result = await pool.query(insertQuery, queryParams);
     
     const newCallId = result.rows[0].id;
     await pool.end();
