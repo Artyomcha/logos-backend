@@ -27,8 +27,8 @@ const audioStorage = multer.diskStorage({
 // Настройка multer для универсальной загрузки аудио
 const universalAudioStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Определяем компанию - приоритет у переданного companyName, затем у токена
-    const companyName = req.body.companyName || req.user?.companyName || 'general';
+    // Определяем компанию - приоритет у заголовка X-Company-Name, затем у поля формы, затем у токена
+    const companyName = req.headers['x-company-name'] || req.body.companyName || req.user?.companyName || 'general';
     const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -292,10 +292,10 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     
     console.log('Audio file received:', req.file.originalname);
     
-    // Определяем компанию - приоритет у переданного companyName, затем у токена
-    const finalCompanyName = companyName || req.user?.companyName;
+    // Определяем компанию - приоритет у заголовка X-Company-Name, затем у поля формы, затем у токена
+    const finalCompanyName = req.headers['x-company-name'] || companyName || req.user?.companyName;
     if (!finalCompanyName) {
-      return res.status(400).json({ message: 'Не указана компания' });
+      return res.status(400).json({ message: 'Не указана компания. Используйте заголовок X-Company-Name или поле companyName в форме' });
     }
     
     // Определяем userId - приоритет у переданного userId, затем у токена
