@@ -23,8 +23,41 @@ const audioStorage = multer.diskStorage({
   }
 });
 
+// Настройка multer для универсальной загрузки аудио
+const universalAudioStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const companyName = req.user?.companyName || 'general';
+    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const timestamp = Date.now();
+    const randomSuffix = Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `call_${timestamp}_${randomSuffix}${ext}`);
+  }
+});
+
 const uploadAudio = multer({ 
   storage: audioStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB для аудио
+  fileFilter: function (req, file, cb) {
+    // Разрешаем только аудио файлы
+    const allowedTypes = ['.wav', '.mp3', '.m4a', '.aac', '.ogg'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только аудио файлы разрешены'), false);
+    }
+  }
+});
+
+const uploadUniversalAudio = multer({ 
+  storage: universalAudioStorage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB для аудио
   fileFilter: function (req, file, cb) {
     // Разрешаем только аудио файлы
@@ -233,6 +266,68 @@ router.post('/calls/:callId/audio', auth, getCompanyDatabase, uploadAudio.single
       message: 'Аудио файл успешно загружен',
       audio_url: audioUrl,
       call_id: callId
+    });
+    
+  } catch (error) {
+    console.error('Error uploading audio file:', error);
+    res.status(500).json({ 
+      message: 'Ошибка при загрузке аудио файла',
+      error: error.message 
+    });
+  }
+});
+
+// Универсальная загрузка аудио файла (автоматически создает запись в dialogues)
+router.post('/audio/upload', auth, getCompanyDatabase, uploadUniversalAudio.single('audio'), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { task_name, full_dialogue } = req.body;
+    
+    console.log('Universal audio upload request for userId:', userId);
+    
+    if (!req.file) {
+      return res.status(400).json({ message: 'Аудио файл не загружен' });
+    }
+    
+    console.log('Audio file received:', req.file.originalname);
+    
+    // Формируем URL для аудио файла
+    const audioUrl = `/uploads/companies/${req.user.companyName}/calls/${req.file.filename}`;
+    console.log('Audio URL:', audioUrl);
+    
+    // Подключаемся к базе данных компании
+    const pool = new Pool({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: req.companyDatabase,
+    });
+    
+    // Создаем новую запись в таблице dialogues
+    const insertQuery = `
+      INSERT INTO dialogues (user_id, task_name, full_dialogue, audio_file_url, recorded_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      RETURNING id
+    `;
+    
+    const result = await pool.query(insertQuery, [
+      userId, 
+      task_name || 'Новый звонок', 
+      full_dialogue || '', 
+      audioUrl
+    ]);
+    
+    const newCallId = result.rows[0].id;
+    await pool.end();
+    
+    console.log('New call record created with ID:', newCallId);
+    
+    res.json({ 
+      message: 'Аудио файл успешно загружен',
+      audio_url: audioUrl,
+      call_id: newCallId,
+      task_name: task_name || 'Новый звонок'
     });
     
   } catch (error) {
