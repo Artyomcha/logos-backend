@@ -331,6 +331,25 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
       database: databaseName,
     });
     
+    // Если передан task_name, проверяем/создаем запись в overall_data
+    let finalTaskName = null;
+    if (task_name) {
+      // Проверяем, существует ли task_name в overall_data
+      const checkTaskQuery = 'SELECT task_name FROM overall_data WHERE task_name = $1';
+      const taskResult = await pool.query(checkTaskQuery, [task_name]);
+      
+      if (taskResult.rows.length === 0) {
+        // Создаем запись в overall_data
+        const insertTaskQuery = `
+          INSERT INTO overall_data (task_name, grade, recorded_at)
+          VALUES ($1, 0, NOW())
+        `;
+        await pool.query(insertTaskQuery, [task_name]);
+        console.log('Created task record in overall_data:', task_name);
+      }
+      finalTaskName = task_name;
+    }
+    
     // Создаем новую запись в таблице dialogues
     const insertQuery = `
       INSERT INTO dialogues (user_id, task_name, full_dialogue, audio_file_url, recorded_at)
@@ -340,7 +359,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
     
     const result = await pool.query(insertQuery, [
       finalUserId, 
-      task_name || 'Новый звонок', 
+      finalTaskName, // Может быть null, если task_name не передан
       full_dialogue || '', 
       audioUrl
     ]);
@@ -354,7 +373,7 @@ router.post('/audio/upload', combinedAuth, uploadUniversalAudio.single('audio'),
       message: 'Аудио файл успешно загружен',
       audio_url: audioUrl,
       call_id: newCallId,
-      task_name: task_name || 'Новый звонок',
+      task_name: finalTaskName || 'Новый звонок',
       company_name: finalCompanyName,
       user_id: finalUserId
     });
