@@ -24,34 +24,38 @@ app.use(express.json());
 // Serve company-specific static files with proper routing
 app.use('/uploads/companies/:company/avatars', (req, res, next) => {
   const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'avatars');
+  // Используем Railway volume path для постоянного хранения
+  const filePath = path.join('/app/uploads/companies', companyName, 'avatars');
   const staticMiddleware = express.static(filePath);
   staticMiddleware(req, res, next);
 });
 
 app.use('/uploads/companies/:company/reports', (req, res, next) => {
   const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'reports');
+  // Используем Railway volume path для постоянного хранения
+  const filePath = path.join('/app/uploads/companies', companyName, 'reports');
   const staticMiddleware = express.static(filePath);
   staticMiddleware(req, res, next);
 });
 
 app.use('/uploads/companies/:company/files', (req, res, next) => {
   const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'files');
+  // Используем Railway volume path для постоянного хранения
+  const filePath = path.join('/app/uploads/companies', companyName, 'files');
   const staticMiddleware = express.static(filePath);
   staticMiddleware(req, res, next);
 });
 
 app.use('/uploads/companies/:company/calls', (req, res, next) => {
   const companyName = req.params.company;
-  const filePath = path.join(__dirname, '../uploads/companies', companyName, 'calls');
+  // Используем Railway volume path для постоянного хранения
+  const filePath = path.join('/app/uploads/companies', companyName, 'calls');
   const staticMiddleware = express.static(filePath);
   staticMiddleware(req, res, next);
 });
 
 // Legacy static file serving (for backward compatibility)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static('/app/uploads'));
 
 // API routes
 app.use('/api/auth', authRoutes);

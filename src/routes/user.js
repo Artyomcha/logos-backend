@@ -12,7 +12,8 @@ const fs = require('fs');
 const avatarStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'avatars');
+    // Используем Railway volume path для постоянного хранения
+    const uploadPath = path.join('/app/uploads/companies', companyName, 'avatars');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }

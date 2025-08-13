@@ -12,7 +12,8 @@ const combinedAuth = require('../middleware/combinedAuth');
 const fileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'files');
+    // Используем Railway volume path для постоянного хранения
+    const uploadPath = path.join('/app/uploads/companies', companyName, 'files');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }

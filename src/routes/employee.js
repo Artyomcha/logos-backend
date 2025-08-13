@@ -11,7 +11,8 @@ const fs = require('fs');
 const audioStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const companyName = req.user?.companyName || 'general';
-    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
+    // Используем Railway volume path для постоянного хранения
+    const uploadPath = path.join('/app/uploads/companies', companyName, 'calls');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -29,7 +30,8 @@ const universalAudioStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     // Определяем компанию - приоритет у заголовка X-Company-Name, затем у поля формы, затем у токена
     const companyName = req.headers['x-company-name'] || req.body.companyName || req.user?.companyName || 'general';
-    const uploadPath = path.join(__dirname, '../../uploads/companies', companyName, 'calls');
+    // Используем Railway volume path для постоянного хранения
+    const uploadPath = path.join('/app/uploads/companies', companyName, 'calls');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
