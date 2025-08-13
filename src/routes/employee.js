@@ -188,16 +188,65 @@ router.get('/calls/:callId', auth, getCompanyDatabase, async (req, res) => {
     
     const callData = result.rows[0];
     
-    // Получаем диалог из поля full_dialogue как есть
+    // Парсим диалог из поля full_dialogue
     let transcript = null;
     if (callData.full_dialogue) {
-      // Создаем простую структуру для отображения всего диалога
-      transcript = [
-        {
-          speaker: 'dialogue',
-          text: callData.full_dialogue
+      try {
+        // Пытаемся парсить как JSON (если это структурированный диалог)
+        const parsedDialogue = JSON.parse(callData.full_dialogue);
+        if (Array.isArray(parsedDialogue)) {
+          transcript = parsedDialogue;
+        } else {
+          // Если это не массив, создаем простую структуру
+          transcript = [
+            {
+              speaker: 'dialogue',
+              text: callData.full_dialogue
+            }
+          ];
         }
-      ];
+      } catch (error) {
+        // Если парсинг не удался, пытаемся разделить по ключевым словам
+        const dialogueText = callData.full_dialogue;
+        const messages = [];
+        
+        // Разделяем текст по ключевым словам
+        const lines = dialogueText.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Определяем говорящего по ключевым словам
+          if (trimmedLine.toLowerCase().includes('специалист') || 
+              trimmedLine.toLowerCase().includes('оператор:') ||
+              trimmedLine.toLowerCase().includes('менеджер:') ||
+              trimmedLine.toLowerCase().includes('employee:')) {
+            messages.push({
+              speaker: 'employee',
+              text: trimmedLine.replace(/^(сотрудник|оператор|менеджер|employee):\s*/i, '').trim()
+            });
+          } else if (trimmedLine.toLowerCase().includes('клиент:') || 
+                     trimmedLine.toLowerCase().includes('customer:')) {
+            messages.push({
+              speaker: 'customer',
+              text: trimmedLine.replace(/^(клиент|customer):\s*/i, '').trim()
+            });
+          } else {
+            // Если не можем определить говорящего, добавляем как общий диалог
+            messages.push({
+              speaker: 'dialogue',
+              text: trimmedLine
+            });
+          }
+        }
+        
+        transcript = messages.length > 0 ? messages : [
+          {
+            speaker: 'dialogue',
+            text: callData.full_dialogue
+          }
+        ];
+      }
     }
     
     // Формируем полный URL для аудио
