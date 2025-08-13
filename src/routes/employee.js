@@ -223,7 +223,7 @@ router.get('/calls/:callId', auth, getCompanyDatabase, async (req, res) => {
               trimmedLine.toLowerCase().includes('employee:')) {
             messages.push({
               speaker: 'employee',
-              text: trimmedLine.replace(/^(сотрудник|оператор|менеджер|employee):\s*/i, '').trim()
+              text: trimmedLine.replace(/^(специалист|оператор|менеджер|employee):\s*/i, '').trim()
             });
           } else if (trimmedLine.toLowerCase().includes('клиент:') || 
                      trimmedLine.toLowerCase().includes('customer:')) {
