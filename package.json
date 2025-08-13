@@ -8,7 +8,6 @@
     "dev": "nodemon src/app.js",
     "init-db": "node src/scripts/initDatabase.js",
     "manage-companies": "node src/scripts/manageCompanyDatabases.js",
-    "startup": "node src/scripts/startup.js",
     "admin": "node admin-tools.js",
     "test-setup": "node test-setup.js",
     "test": "echo \"Error: no test specified\" && exit 1"
