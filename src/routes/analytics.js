@@ -168,7 +168,7 @@ router.get('/call-quality', auth, async (req, res) => {
       WITH latest_calls AS (
         SELECT 
           cq.user_id,
-          MAX(cq.date) as latest_date
+          MAX(cq.created_at) as latest_call_time
         FROM call_quality cq
         WHERE cq.forbidden_phrases_count > 0 
           AND cq.date >= CURRENT_DATE - INTERVAL '30 days'
@@ -182,7 +182,7 @@ router.get('/call-quality', auth, async (req, res) => {
       FROM call_quality cq
       JOIN employees e ON cq.user_id = e.id
       JOIN user_auth u ON e.user_id = u.id
-      JOIN latest_calls lc ON cq.user_id = lc.user_id AND cq.date = lc.latest_date
+      JOIN latest_calls lc ON cq.user_id = lc.user_id AND cq.created_at = lc.latest_call_time
       WHERE cq.forbidden_phrases_count > 0
       ORDER BY cq.forbidden_phrases_count DESC
     `);
