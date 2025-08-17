@@ -165,18 +165,26 @@ router.get('/call-quality', auth, async (req, res) => {
     
     // 4. Запрещенные фразы
     const forbiddenPhrasesResult = await connection.query(`
+      WITH latest_calls AS (
+        SELECT 
+          cq.user_id,
+          MAX(cq.date) as latest_date
+        FROM call_quality cq
+        WHERE cq.forbidden_phrases_count > 0 
+          AND cq.date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY cq.user_id
+      )
       SELECT 
         u.first_name,
         u.last_name,
-        COUNT(*) as incidents_count,
-        STRING_AGG(DISTINCT cq.forbidden_phrases_list, ', ') as phrases_list
+        cq.forbidden_phrases_count as incidents_count,
+        cq.forbidden_phrases_list as phrases_list
       FROM call_quality cq
       JOIN employees e ON cq.user_id = e.id
       JOIN user_auth u ON e.user_id = u.id
-      WHERE cq.forbidden_phrases_count > 0 
-        AND cq.date >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY u.id, u.first_name, u.last_name
-      ORDER BY incidents_count DESC
+      JOIN latest_calls lc ON cq.user_id = lc.user_id AND cq.date = lc.latest_date
+      WHERE cq.forbidden_phrases_count > 0
+      ORDER BY cq.forbidden_phrases_count DESC
     `);
     
     res.json({

@@ -13,8 +13,8 @@ async function initializeDatabase() {
       console.log('Database is already initialized. All tables exist.');
       return;
     }
+
     
-    // Initialize database
     await DatabaseService.initializeDatabase();
     console.log('Database initialization completed successfully!');
     
