@@ -44,6 +44,42 @@ const upload = multer({
   }
 });
 
+// Вспомогательная функция для получения employee_id
+async function getEmployeeId(connection, req, userId) {
+  let targetUserId;
+  
+  if (req.user.apiKey) {
+    // Если используется API ключ, используем userId из параметра
+    // userId здесь - это ID в таблице employees
+    targetUserId = userId;
+  } else {
+    // Если используется JWT токен, используем ID из токена
+    // req.user.id - это ID в таблице user_auth, нужно найти соответствующий employees.id
+    const employeeResult = await connection.query(
+      'SELECT id FROM employees WHERE user_id = $1',
+      [req.user.id]
+    );
+    
+    if (employeeResult.rows.length === 0) {
+      throw new Error('Пользователь не найден в таблице сотрудников');
+    }
+    
+    return employeeResult.rows[0].id;
+  }
+  
+  // Для API ключа проверяем, что такой employee_id существует
+  const employeeResult = await connection.query(
+    'SELECT id FROM employees WHERE id = $1',
+    [targetUserId]
+  );
+  
+  if (employeeResult.rows.length === 0) {
+    throw new Error('Пользователь не найден в таблице сотрудников');
+  }
+  
+  return employeeResult.rows[0].id;
+}
+
 // POST - Получить все доступные кейсы для обучения
 router.post('/get-cases', trainingAuth, async (req, res) => {
   try {
