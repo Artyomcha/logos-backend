@@ -48,13 +48,23 @@ const upload = multer({
 async function getEmployeeId(connection, req, userId) {
   console.log('getEmployeeId called with:', { userId, apiKey: req.user.apiKey, user: req.user });
   
-  let targetUserId;
-  
   if (req.user.apiKey) {
-    // Если используется API ключ, используем userId из параметра
-    // userId здесь - это ID в таблице employees
-    targetUserId = userId;
-    console.log('Using API key, targetUserId:', targetUserId);
+    // Если используется API ключ, userId - это ID в таблице employees
+    console.log('Using API key, userId is employee ID:', userId);
+    
+    // Проверяем, что такой employee_id существует
+    const employeeResult = await connection.query(
+      'SELECT id FROM employees WHERE id = $1',
+      [userId]
+    );
+    
+    console.log('Employee result:', employeeResult.rows);
+    
+    if (employeeResult.rows.length === 0) {
+      throw new Error('Пользователь не найден в таблице сотрудников');
+    }
+    
+    return userId; // Возвращаем userId как есть, так как это уже employee ID
   } else {
     // Если используется JWT токен, используем ID из токена
     // req.user.id - это ID в таблице user_auth, нужно найти соответствующий employees.id
@@ -69,21 +79,6 @@ async function getEmployeeId(connection, req, userId) {
     
     return employeeResult.rows[0].id;
   }
-  
-  // Для API ключа проверяем, что такой employee_id существует
-  console.log('Checking employee with id:', targetUserId);
-  const employeeResult = await connection.query(
-    'SELECT id FROM employees WHERE id = $1',
-    [targetUserId]
-  );
-  
-  console.log('Employee result:', employeeResult.rows);
-  
-  if (employeeResult.rows.length === 0) {
-    throw new Error('Пользователь не найден в таблице сотрудников');
-  }
-  
-  return employeeResult.rows[0].id;
 }
 
 // POST - Получить все доступные кейсы для обучения
@@ -154,20 +149,13 @@ router.post('/create-case', trainingAuth, async (req, res) => {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    console.log('Looking for employee with user_id:', userId);
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    console.log('Employee result:', employeeResult.rows);
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+      console.log('Found employeeId:', employeeId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
-    console.log('Found employeeId:', employeeId);
     
     // Создаем новый кейс
     const result = await connection.query(`
