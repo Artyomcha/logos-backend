@@ -15,6 +15,7 @@ const analyticsRoutes = require('./routes/analytics');
 const employeeStatsRoutes = require('./routes/employeeStats');
 const employeeRoutes = require('./routes/employee');
 const apiKeysRoutes = require('./routes/apiKeys');
+const trainingRoutes = require('./routes/training');
 const DatabaseService = require('./services/databaseService');
 
 const app = express();
@@ -54,6 +55,14 @@ app.use('/uploads/companies/:company/calls', (req, res, next) => {
   staticMiddleware(req, res, next);
 });
 
+app.use('/uploads/companies/:company/training', (req, res, next) => {
+  const companyName = req.params.company;
+  // Используем Railway volume path для постоянного хранения
+  const filePath = path.join('/app/uploads/companies', companyName, 'training');
+  const staticMiddleware = express.static(filePath);
+  staticMiddleware(req, res, next);
+});
+
 // Legacy static file serving (for backward compatibility)
 app.use('/uploads', express.static('/app/uploads'));
 
@@ -70,6 +79,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/employee-stats', employeeStatsRoutes);
 app.use('/api/employee', employeeRoutes);
 app.use('/api/keys', apiKeysRoutes);
+app.use('/api/training', trainingRoutes);
 
 // Get all companies
 app.get('/api/companies', async (req, res) => {

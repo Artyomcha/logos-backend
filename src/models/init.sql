@@ -127,6 +127,22 @@ CREATE TABLE IF NOT EXISTS call_quality (
     FOREIGN KEY (user_id) REFERENCES user_auth(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS call_training (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    length INTEGER DEFAULT 0,
+    recommendations TEXT,
+    trail1_url VARCHAR(500),
+    trail1_grade INTEGER DEFAULT 0,
+    trail2_url VARCHAR(500),
+    trail2_grade INTEGER DEFAULT 0,
+    trail3_url VARCHAR(500),
+    trail3_grade INTEGER DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_auth_email ON user_auth(email);
 CREATE INDEX IF NOT EXISTS idx_user_auth_company ON user_auth(company_name);
@@ -141,3 +157,4 @@ CREATE INDEX IF NOT EXISTS idx_department_analytics_user_id ON department_analyt
 CREATE INDEX IF NOT EXISTS idx_department_analytics_date ON department_analytics(date);
 CREATE INDEX IF NOT EXISTS idx_call_quality_user_id ON call_quality(user_id);
 CREATE INDEX IF NOT EXISTS idx_call_quality_date ON call_quality(date);
+CREATE INDEX IF NOT EXISTS idx_call_training_user_id ON call_training(user_id);
