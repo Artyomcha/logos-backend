@@ -45,11 +45,15 @@ const upload = multer({
 });
 
 // Вспомогательная функция для получения employee_id
-async function getEmployeeId(connection, req, userId) {
+async function getEmployeeId(connection, req, userId = null) {
   console.log('getEmployeeId called with:', { userId, apiKey: req.user.apiKey, user: req.user });
   
   if (req.user.apiKey) {
     // Если используется API ключ, userId - это ID в таблице employees
+    if (!userId) {
+      throw new Error('userId обязателен для API ключа');
+    }
+    
     console.log('Using API key, userId is employee ID:', userId);
     
     // Проверяем, что такой employee_id существует
@@ -86,23 +90,20 @@ router.post('/get-cases', trainingAuth, async (req, res) => {
   try {
     const { userId } = req.body;
     
-    if (!userId) {
-      return res.status(400).json({ message: 'userId обязателен' });
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
     
     // Получаем все кейсы для обучения
     const casesResult = await connection.query(`
@@ -142,8 +143,9 @@ router.post('/create-case', trainingAuth, async (req, res) => {
       return res.status(400).json({ message: 'Название кейса обязательно' });
     }
     
-    if (!userId) {
-      return res.status(400).json({ message: 'userId обязателен' });
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
@@ -184,8 +186,13 @@ router.post('/upload-audio', trainingAuth, upload.single('audio'), async (req, r
       return res.status(400).json({ message: 'Аудио файл не предоставлен' });
     }
     
-    if (!userId || !caseId || !attemptNumber) {
-      return res.status(400).json({ message: 'userId, caseId и attemptNumber обязательны' });
+    if (!caseId || !attemptNumber) {
+      return res.status(400).json({ message: 'caseId и attemptNumber обязательны' });
+    }
+    
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     if (![1, 2, 3].includes(parseInt(attemptNumber))) {
@@ -195,16 +202,12 @@ router.post('/upload-audio', trainingAuth, upload.single('audio'), async (req, r
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
     
     // Проверяем, что кейс принадлежит указанному пользователю
     const caseResult = await connection.query(
@@ -252,8 +255,13 @@ router.post('/update-grade', trainingAuth, async (req, res) => {
       return res.status(400).json({ message: 'Оценка должна быть от 0 до 100' });
     }
     
-    if (!userId || !caseId || !attemptNumber) {
-      return res.status(400).json({ message: 'userId, caseId и attemptNumber обязательны' });
+    if (!caseId || !attemptNumber) {
+      return res.status(400).json({ message: 'caseId и attemptNumber обязательны' });
+    }
+    
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     if (![1, 2, 3].includes(parseInt(attemptNumber))) {
@@ -263,16 +271,12 @@ router.post('/update-grade', trainingAuth, async (req, res) => {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
     
     // Проверяем, что кейс принадлежит указанному пользователю
     const caseResult = await connection.query(
@@ -312,23 +316,24 @@ router.post('/get-case', trainingAuth, async (req, res) => {
   try {
     const { caseId, userId } = req.body;
     
-    if (!userId || !caseId) {
-      return res.status(400).json({ message: 'userId и caseId обязательны' });
+    if (!caseId) {
+      return res.status(400).json({ message: 'caseId обязателен' });
+    }
+    
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
     
     // Получаем детали кейса
     const caseResult = await connection.query(`
@@ -413,8 +418,13 @@ router.post('/get-evaluation', trainingAuth, async (req, res) => {
   try {
     const { caseId, attemptNumber, userId } = req.body;
     
-    if (!userId || !caseId || !attemptNumber) {
-      return res.status(400).json({ message: 'userId, caseId и attemptNumber обязательны' });
+    if (!caseId || !attemptNumber) {
+      return res.status(400).json({ message: 'caseId и attemptNumber обязательны' });
+    }
+    
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
     }
     
     if (![1, 2, 3].includes(parseInt(attemptNumber))) {
@@ -424,16 +434,12 @@ router.post('/get-evaluation', trainingAuth, async (req, res) => {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
     // Получаем employee_id для указанного пользователя
-    const employeeResult = await connection.query(
-      'SELECT id FROM employees WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (employeeResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Пользователь не найден в таблице сотрудников' });
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
-    
-    const employeeId = employeeResult.rows[0].id;
     
     // Получаем информацию о конкретной попытке
     const trailUrlColumn = `trail${attemptNumber}_url`;

@@ -215,7 +215,8 @@ exports.verify2FA = async (req, res) => {
     res.json({ 
       token, 
       role: user.role, 
-      companyName: user.company_name 
+      companyName: user.company_name,
+      userId: user.id
     });
   } catch (error) {
     console.error('2FA verification error:', error);
