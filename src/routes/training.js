@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const trainingAuth = require('../middleware/trainingAuth');
 const DatabaseService = require('../services/databaseService');
 const multer = require('multer');
 const path = require('path');
@@ -44,7 +45,7 @@ const upload = multer({
 });
 
 // POST - Получить все доступные кейсы для обучения
-router.post('/get-cases', auth, async (req, res) => {
+router.post('/get-cases', trainingAuth, async (req, res) => {
   try {
     const { userId } = req.body;
     
@@ -96,7 +97,7 @@ router.post('/get-cases', auth, async (req, res) => {
 });
 
 // POST - Создать новый кейс обучения
-router.post('/create-case', auth, async (req, res) => {
+router.post('/create-case', trainingAuth, async (req, res) => {
   try {
     const { title, length, recommendations, userId } = req.body;
     
@@ -141,7 +142,7 @@ router.post('/create-case', auth, async (req, res) => {
 });
 
 // POST - Загрузить аудио файл для попытки
-router.post('/upload-audio', auth, upload.single('audio'), async (req, res) => {
+router.post('/upload-audio', trainingAuth, upload.single('audio'), async (req, res) => {
   try {
     const { caseId, attemptNumber, userId } = req.body;
     
@@ -209,7 +210,7 @@ router.post('/upload-audio', auth, upload.single('audio'), async (req, res) => {
 });
 
 // POST - Обновить оценку для попытки
-router.post('/update-grade', auth, async (req, res) => {
+router.post('/update-grade', trainingAuth, async (req, res) => {
   try {
     const { caseId, attemptNumber, grade, userId } = req.body;
     
@@ -273,7 +274,7 @@ router.post('/update-grade', auth, async (req, res) => {
 });
 
 // POST - Получить детали конкретного кейса
-router.post('/get-case', auth, async (req, res) => {
+router.post('/get-case', trainingAuth, async (req, res) => {
   try {
     const { caseId, userId } = req.body;
     
@@ -328,7 +329,7 @@ router.post('/get-case', auth, async (req, res) => {
 });
 
 // GET - Получить аудио файлы, ожидающие оценки (для n8n)
-router.get('/pending-evaluations', auth, async (req, res) => {
+router.get('/pending-evaluations', trainingAuth, async (req, res) => {
   try {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
@@ -374,7 +375,7 @@ router.get('/pending-evaluations', auth, async (req, res) => {
 });
 
 // POST - Получить конкретный аудио файл для оценки
-router.post('/get-evaluation', auth, async (req, res) => {
+router.post('/get-evaluation', trainingAuth, async (req, res) => {
   try {
     const { caseId, attemptNumber, userId } = req.body;
     
