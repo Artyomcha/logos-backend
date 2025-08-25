@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS call_training (
     title VARCHAR(255) NOT NULL,
     length INTEGER DEFAULT 0,
     recommendations TEXT,
+    quote TEXT,
     trail1_url VARCHAR(500),
     trail1_grade INTEGER DEFAULT 0,
     trail2_url VARCHAR(500),
