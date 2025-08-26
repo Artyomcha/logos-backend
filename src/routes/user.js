@@ -57,7 +57,13 @@ router.get('/profile', auth, async (req, res) => {
 
 router.post('/password', auth, async (req, res) => {
   try {
+    console.log('Password change request body:', req.body);
     const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Текущий и новый пароль обязательны' });
+    }
+    
     const user = await getUserById(req.user.id, req.user.companyName);
     if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
     
