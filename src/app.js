@@ -8,8 +8,7 @@ const { securityMonitoring, fileUploadMonitoring, rateLimitMonitoring } = requir
 require('dotenv').config();
 const path = require('path');
 
-// Простое хранилище CSRF токенов
-const csrfTokens = new Set();
+
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
@@ -129,10 +128,15 @@ const uploadLimiter = rateLimit({
 app.use('/api/upload', uploadLimiter);
 app.use('/api/training/upload-audio', uploadLimiter);
 
-// CSRF защита (header-based) — для кросс-доменных запросов
+// CSRF защита (cookie-based) — применяем для браузерных запросов
+// Для кросс-доменных запросов фронт (logos-tech.ru) → бэк: SameSite=None и Secure обязателен
 const csrfProtection = csrf({
-  ignoreMethods: ['GET', 'HEAD', 'OPTIONS'],
-  cookie: false // Отключаем cookie, используем только заголовки
+  cookie: {
+    httpOnly: false, // Изменяем на false для доступа из JavaScript
+    sameSite: 'none',
+    secure: true,
+    name: 'csrf'
+  }
 });
 
 // Условный байпас CSRF для машинных клиентов (n8n, мобильные, интеграции)
@@ -188,32 +192,32 @@ app.use((req, res, next) => {
   if (shouldBypassCsrf(req)) return next();
   
   console.log('Applying CSRF protection to:', req.method, req.path);
+  console.log('Cookies:', req.headers.cookie);
   console.log('CSRF token in headers:', req.headers['x-csrf-token']);
   
-  // Проверяем CSRF токен
-  const token = req.headers['x-csrf-token'];
-  if (!token || !csrfTokens.has(token)) {
-    console.error('CSRF token validation failed');
-    return res.status(403).json({ 
-      message: 'CSRF токен недействителен или отсутствует',
-      error: 'CSRF_ERROR'
-    });
-  }
-  
-  // Удаляем использованный токен
-  csrfTokens.delete(token);
-  next();
+  return csrfProtection(req, res, next);
 });
 
-// Эндпоинт для выдачи CSRF токена фронту
+// Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {
   console.log('CSRF token request received');
+  console.log('Cookies in CSRF request:', req.headers.cookie);
   
-  // Генерируем токен и сохраняем его
-  const token = require('crypto').randomBytes(32).toString('hex');
-  csrfTokens.add(token);
-  console.log('CSRF token generated successfully:', token.substring(0, 10) + '...');
-  return res.json({ csrfToken: token });
+  // Применяем CSRF middleware только для этого эндпоинта
+  return csrfProtection(req, res, (err) => {
+    if (err) {
+      console.error('CSRF token generation error:', err);
+      return res.status(403).json({ 
+        message: 'Ошибка получения CSRF токена',
+        error: 'CSRF_ERROR'
+      });
+    }
+    
+    const token = req.csrfToken();
+    console.log('CSRF token generated successfully:', token.substring(0, 10) + '...');
+    console.log('Response cookies:', res.getHeaders()['set-cookie']);
+    return res.json({ csrfToken: token });
+  });
 });
 
 
