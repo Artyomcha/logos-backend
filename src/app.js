@@ -84,7 +84,7 @@ const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https',
+    secure: true, // Включаем secure для HTTPS
     name: 'csrf' // Явно указываем имя cookie
   }
 });
