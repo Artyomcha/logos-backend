@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const csrf = require('csurf');
+const { securityMonitoring, fileUploadMonitoring, rateLimitMonitoring } = require('./middleware/securityMonitoring');
 require('dotenv').config();
 const path = require('path');
 
@@ -32,9 +33,9 @@ app.use(helmet({
 
 // CORS (ограничьте origin)
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
   'https://logos-tech.ru',
+  'https://www.logos-tech.ru',
+  // Добавьте другие продакшен домены если нужно
 ];
 app.use(cors({
   origin: (origin, cb) => {
@@ -48,6 +49,11 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Подключаем мониторинг безопасности
+app.use(securityMonitoring);
+app.use(fileUploadMonitoring);
+app.use(rateLimitMonitoring);
 
 // Глобальный rate limit (на все API)
 const apiLimiter = rateLimit({
@@ -78,7 +84,7 @@ const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: true, // Отключаем secure для разработки и тестирования
+    secure: req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https',
     name: 'csrf' // Явно указываем имя cookie
   }
 });
@@ -155,6 +161,8 @@ app.get('/api/csrf-token', (req, res) => {
     return res.json({ csrfToken: token });
   });
 });
+
+
 
 // Обработка ошибок CSRF
 app.use((err, req, res, next) => {
