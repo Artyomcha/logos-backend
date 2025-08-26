@@ -23,10 +23,16 @@ router.get('/department', auth, async (req, res) => {
       SELECT 
         date,
         AVG(call_duration_seconds) as avg_duration
-      FROM department_analytics 
-      GROUP BY date 
+      FROM (
+        SELECT 
+          date,
+          AVG(call_duration_seconds) as avg_duration
+        FROM department_analytics 
+        GROUP BY date 
+        ORDER BY date DESC
+        LIMIT 7
+      ) subquery
       ORDER BY date ASC
-      LIMIT 7
     `);
     
     // 3. Количество успешных звонков (кольцевая диаграмма)
@@ -143,9 +149,18 @@ router.get('/call-quality', auth, async (req, res) => {
         date,
         AVG(stages_completed::DECIMAL / total_stages::DECIMAL * 100) as completion_rate,
         AVG(total_stages - stages_completed) as missed_stages
-      FROM call_quality 
+      FROM (
+        SELECT 
+          date,
+          stages_completed,
+          total_stages
+        FROM call_quality 
+        GROUP BY date, stages_completed, total_stages
+        ORDER BY date DESC
+        LIMIT 7
+      ) subquery
       GROUP BY date 
-      ORDER BY date ASC 
+      ORDER BY date ASC
     `);
     
     // 3. Использование ключевых фраз
