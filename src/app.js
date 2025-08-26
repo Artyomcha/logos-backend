@@ -35,7 +35,7 @@ app.set('trust proxy', (ip) => {
 // Helmet (базовые заголовки безопасности) - исключаем email
 app.use((req, res, next) => {
   // Пропускаем Helmet для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
     return next();
   }
   
@@ -47,7 +47,7 @@ app.use((req, res, next) => {
 // CORS (ограничьте origin) - исключаем email
 app.use((req, res, next) => {
   // Пропускаем CORS для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
     return next();
   }
   
@@ -74,7 +74,7 @@ app.use(cookieParser());
 // Подключаем мониторинг безопасности - исключаем email
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
     return next();
   }
   securityMonitoring(req, res, next);
@@ -82,7 +82,7 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
     return next();
   }
   fileUploadMonitoring(req, res, next);
@@ -90,7 +90,7 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
     return next();
   }
   rateLimitMonitoring(req, res, next);
@@ -104,7 +104,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => {
     // Пропускаем email и SMTP запросы
-    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail');
+    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/');
   }
 });
 app.use('/api/', apiLimiter);
@@ -115,7 +115,7 @@ const authLimiter = rateLimit({
   max: 10,
   skip: (req) => {
     // Пропускаем email и SMTP запросы
-    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail');
+    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/');
   }
 });
 app.use('/api/auth', authLimiter);
