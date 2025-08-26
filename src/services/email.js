@@ -29,7 +29,7 @@ async function send2FACode(to, code) {
   console.log('To:', to);
   console.log('From:', process.env.SMTP_USER);
   console.log('Host:', process.env.SMTP_HOST);
-  console.log('Port:', process.env.SMTP_PORT);
+  console.log('Port:', 465);
   
   try {
     console.log('Attempting to send email...');
@@ -48,6 +48,7 @@ async function send2FACode(to, code) {
     console.error('Error command:', error.command);
     console.error('Error response:', error.response);
     console.error('Error responseCode:', error.responseCode);
+    console.error('Full error:', error);
     console.error('==================');
     
     // Если SMTP недоступен, возвращаем специальную ошибку
