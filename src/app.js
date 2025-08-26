@@ -29,20 +29,10 @@ const app = express();
 // Trust proxy для Railway - используем более безопасную настройку
 app.set('trust proxy', 1);
 
-// Helmet (базовые заголовки безопасности) - исключаем email
-app.use((req, res, next) => {
-  // Пропускаем Helmet для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
-    return next();
-  }
-  
-  // Временно отключаем Helmet для всех запросов
-  return next();
-  
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  })(req, res, next);
-});
+// Helmet (базовые заголовки безопасности)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
 // CORS (ограничьте origin) - применяем ко всем запросам
 const allowedOrigins = [
@@ -65,44 +55,27 @@ app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use(cookieParser());
 
-// Подключаем мониторинг безопасности - исключаем email
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
-    return next();
-  }
-  securityMonitoring(req, res, next);
-});
+// Подключаем мониторинг безопасности
+app.use(securityMonitoring);
+app.use(fileUploadMonitoring);
+app.use(rateLimitMonitoring);
 
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
-    return next();
-  }
-  fileUploadMonitoring(req, res, next);
-});
-
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
-    return next();
-  }
-  rateLimitMonitoring(req, res, next);
-});
-
-// Глобальный rate limit (на все API) - исключаем email
+// Глобальный rate limit (на все API) - исключаем email и 2FA
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Пропускаем email и SMTP запросы
+    // Пропускаем email, SMTP и 2FA запросы
     return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp';
   }
 });
-// Временно отключаем rate limiting
-// app.use('/api/', apiLimiter);
+app.use('/api/', apiLimiter);
+
+// Исключаем 2FA роуты из rate limiting
+app.use('/api/auth/login', (req, res, next) => next());
+app.use('/api/auth/verify-2fa', (req, res, next) => next());
 
 // Убираем rate limiter для auth маршрутов, чтобы не блокировать SMTP
 
@@ -122,7 +95,9 @@ const csrfProtection = csrf({
     sameSite: 'none',
     secure: true,
     name: 'csrf'
-  }
+  },
+  ignoreMethods: ['POST'],
+  ignoreRoutes: ['/api/auth/login', '/api/auth/verify-2fa']
 });
 
 // Условный байпас CSRF для машинных клиентов (n8n, мобильные, интеграции)
@@ -149,11 +124,10 @@ function shouldBypassCsrf(req) {
   return false;
 }
 
-// Временно отключаем CSRF защиту
-// app.use((req, res, next) => {
-//   if (shouldBypassCsrf(req)) return next();
-//   return csrfProtection(req, res, next);
-// });
+app.use((req, res, next) => {
+  if (shouldBypassCsrf(req)) return next();
+  return csrfProtection(req, res, next);
+});
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {

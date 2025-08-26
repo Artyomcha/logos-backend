@@ -11,48 +11,26 @@ console.log('========================');
 
 // Создаем transporter с портом 587 (STARTTLS) для Gmail
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Используем сервис Gmail
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  },
-  // Добавляем таймауты
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-  // Добавляем debug
-  debug: true,
-  logger: true
+  }
 });
 
 async function send2FACode(to, code) {
-  console.log('=== SENDING 2FA CODE ===');
-  console.log('To:', to);
-  console.log('From:', process.env.SMTP_USER);
-  console.log('Host:', process.env.SMTP_HOST);
-  console.log('Port:', 587);
-  
   try {
-    console.log('Attempting to send email...');
     const result = await transporter.sendMail({
       from: process.env.SMTP_USER,
       to,
       subject: 'Your verification code',
       text: `Your verification code: ${code}`,
     });
-    console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (error) {
-    console.error('=== SMTP ERROR ===');
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('Error command:', error.command);
-    console.error('Error response:', error.response);
-    console.error('Error responseCode:', error.responseCode);
-    console.error('Full error:', error);
-    console.error('==================');
-    
-    // Если SMTP недоступен, возвращаем специальную ошибку
     if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH' || error.code === 'EINVALIDUSER' || error.code === 'EINVALIDPASS') {
       throw new Error('SMTP_UNAVAILABLE');
     }
