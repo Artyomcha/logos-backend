@@ -171,7 +171,9 @@ exports.login = async (req, res) => {
     console.log('Stored codes:', Array.from(codes.entries()));
     
     try {
+      console.log('Attempting to send 2FA code via email...');
       await send2FACode(email, code);
+      console.log('2FA code sent successfully via email');
       res.json({ 
         message: 'Код отправлен на email',
         companyName: foundCompany

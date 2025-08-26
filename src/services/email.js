@@ -2,34 +2,55 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // Проверяем наличие SMTP настроек
-console.log('SMTP Configuration:', {
-  host: process.env.SMTP_HOST ? 'set' : 'not set',
-  port: process.env.SMTP_PORT ? 'set' : 'not set',
-  user: process.env.SMTP_USER ? 'set' : 'not set',
-  pass: process.env.SMTP_PASS ? 'set' : 'not set'
-});
+console.log('=== SMTP CONFIGURATION ===');
+console.log('SMTP_HOST:', process.env.SMTP_HOST);
+console.log('SMTP_PORT:', process.env.SMTP_PORT);
+console.log('SMTP_USER:', process.env.SMTP_USER);
+console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT_SET');
+console.log('========================');
 
-// Создаем transporter с базовыми настройками
+// Создаем transporter с правильными настройками для Gmail
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: true,
+  secure: false, // false для порта 587
+  requireTLS: true, // Требуем TLS
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  }
+  },
+  // Добавляем таймауты
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 async function send2FACode(to, code) {
+  console.log('=== SENDING 2FA CODE ===');
+  console.log('To:', to);
+  console.log('From:', process.env.SMTP_USER);
+  console.log('Host:', process.env.SMTP_HOST);
+  console.log('Port:', process.env.SMTP_PORT);
+  
   try {
+    console.log('Attempting to send email...');
     const result = await transporter.sendMail({
       from: process.env.SMTP_USER,
       to,
       subject: 'Your verification code',
       text: `Your verification code: ${code}`,
     });
+    console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (error) {
+    console.error('=== SMTP ERROR ===');
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error command:', error.command);
+    console.error('Error response:', error.response);
+    console.error('Error responseCode:', error.responseCode);
+    console.error('==================');
+    
     // Если SMTP недоступен, возвращаем специальную ошибку
     if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH' || error.code === 'EINVALIDUSER' || error.code === 'EINVALIDPASS') {
       throw new Error('SMTP_UNAVAILABLE');
