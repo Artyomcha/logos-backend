@@ -3,35 +3,58 @@ require('dotenv').config();
 
 // Проверяем наличие SMTP настроек
 console.log('SMTP Configuration:', {
-  host: process.env.SMTP_HOST ? 'set' : 'not set',
-  port: process.env.SMTP_PORT ? 'set' : 'not set',
-  user: process.env.SMTP_USER ? 'set' : 'not set',
-  pass: process.env.SMTP_PASS ? 'set' : 'not set'
+  host: process.env.SMTP_HOST || 'NOT_SET',
+  port: process.env.SMTP_PORT || 'NOT_SET',
+  user: process.env.SMTP_USER || 'NOT_SET',
+  pass: process.env.SMTP_PASS ? 'SET' : 'NOT_SET'
 });
 
-// Создаем transporter с базовыми настройками (как было раньше)
+// Создаем transporter с таймаутами
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false,
+  secure: false, // false для порта 587 (STARTTLS)
+  requireTLS: true, // Требуем TLS
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  }
+  },
+  // Добавляем таймауты чтобы не зависать
+  connectionTimeout: 10000, // 10 секунд
+  greetingTimeout: 10000,   // 10 секунд
+  socketTimeout: 10000      // 10 секунд
 });
 
 async function send2FACode(to, code) {
-  console.log('Sending 2FA code:', { to, code });
+  console.log('Attempting to send 2FA code to:', to);
+  console.log('SMTP settings:', {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    user: process.env.SMTP_USER
+  });
+  
   try {
-    await transporter.sendMail({
+    const result = await transporter.sendMail({
       from: process.env.SMTP_USER,
       to,
       subject: 'Your verification code',
       text: `Your verification code: ${code}`,
     });
-    console.log('2FA code sent successfully to:', to);
+    console.log('Email sent successfully:', result.messageId);
+    return result;
   } catch (error) {
-    console.error('Error sending 2FA code:', error);
+    console.error('SMTP error details:', {
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      message: error.message
+    });
+    
+    // Если SMTP недоступен, возвращаем специальную ошибку
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH') {
+      throw new Error('SMTP_UNAVAILABLE');
+    }
     throw error;
   }
 }
