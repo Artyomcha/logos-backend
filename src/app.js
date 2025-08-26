@@ -99,16 +99,7 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// Усиленный лимит на авторизацию/брутфорс-чувствительные роуты - исключаем email
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  skip: (req) => {
-    // Пропускаем email и SMTP запросы
-    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/');
-  }
-});
-app.use('/api/auth', authLimiter);
+// Убираем rate limiter для auth маршрутов, чтобы не блокировать SMTP
 
 // Лимит на загрузку файлов (чтобы не DDOS-ить I/O)
 const uploadLimiter = rateLimit({
