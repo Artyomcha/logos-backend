@@ -9,12 +9,11 @@ console.log('SMTP_USER:', process.env.SMTP_USER);
 console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT_SET');
 console.log('========================');
 
-// Создаем transporter с правильными настройками для Gmail
+// Создаем transporter с портом 465 (SSL) для Railway
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // false для порта 587
-  requireTLS: true, // Требуем TLS
+  port: 465, // Используем порт 465 для SSL
+  secure: true, // Включаем SSL
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
