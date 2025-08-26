@@ -49,10 +49,31 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const mimetype = (file.mimetype || '').toLowerCase();
     const name = file.originalname || '';
-    if (hasDoubleExtension(name)) return cb(new Error('Запрещены двойные расширения'), false);
-    if (!SAFE_AUDIO_MIME.has(mimetype)) return cb(new Error('Только аудио файлы разрешены'), false);
+    
+    console.log('File validation:', {
+      mimetype,
+      originalname: name,
+      size: file.size,
+      hasDoubleExt: hasDoubleExtension(name),
+      isSafeMime: SAFE_AUDIO_MIME.has(mimetype),
+      safeExt: getSafeAudioExt(name)
+    });
+    
+    if (hasDoubleExtension(name)) {
+      console.log('File rejected: double extension');
+      return cb(new Error('Запрещены двойные расширения'), false);
+    }
+    if (!SAFE_AUDIO_MIME.has(mimetype)) {
+      console.log('File rejected: unsafe mimetype');
+      return cb(new Error('Только аудио файлы разрешены'), false);
+    }
     const ext = getSafeAudioExt(name);
-    if (!ext) return cb(new Error('Недопустимое аудио-расширение'), false);
+    if (!ext) {
+      console.log('File rejected: unsafe extension');
+      return cb(new Error('Недопустимое аудио-расширение'), false);
+    }
+    
+    console.log('File validation passed');
     cb(null, true);
   }
 });
@@ -191,7 +212,26 @@ router.post('/create-case', trainingAuth, async (req, res) => {
 });
 
 // POST - Загрузить аудио файл для попытки
-router.post('/upload-audio', trainingAuth, upload.single('audio'), async (req, res) => {
+router.post('/upload-audio', trainingAuth, upload.single('audio'), (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'Файл слишком большой. Максимальный размер: 50MB' });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ message: 'Можно загрузить только один файл' });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: 'Неожиданное поле файла' });
+    }
+    return res.status(400).json({ message: 'Ошибка загрузки файла' });
+  }
+  if (err) {
+    console.error('File upload error:', err);
+    return res.status(400).json({ message: err.message || 'Ошибка валидации файла' });
+  }
+  next();
+}, async (req, res) => {
   try {
     const { caseId, attemptNumber, userId } = req.body;
     
