@@ -30,80 +30,44 @@ app.set('trust proxy', (ip) => {
   return false;
 });
 
-// Helmet (базовые заголовки безопасности) - применяем только к веб-запросам, не к SMTP
-app.use((req, res, next) => {
-  // Пропускаем Helmet для SMTP и системных запросов
-  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
-    return next();
-  }
-  
-  // Применяем Helmet только к веб-запросам
-  helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
-  })(req, res, next);
-});
+// Helmet (базовые заголовки безопасности)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 
-// CORS (ограничьте origin) - исключаем SMTP
-app.use((req, res, next) => {
-  // Пропускаем CORS для SMTP и системных запросов
-  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
-    return next();
-  }
-  
-  const allowedOrigins = [
-    'https://logos-tech.ru',
-    'https://www.logos-tech.ru',
-    // Добавьте другие продакшен домены если нужно
-  ];
-  
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
-  })(req, res, next);
-});
+// CORS (ограничьте origin)
+const allowedOrigins = [
+  'https://logos-tech.ru',
+  'https://www.logos-tech.ru',
+  // Добавьте другие продакшен домены если нужно
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
+}));
 
 app.use(express.json());
 app.use(cookieParser());
 
-// Подключаем мониторинг безопасности - исключаем SMTP
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для SMTP и системных запросов
-  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
-    return next();
-  }
-  securityMonitoring(req, res, next);
-});
+// Подключаем мониторинг безопасности
+app.use(securityMonitoring);
+app.use(fileUploadMonitoring);
+app.use(rateLimitMonitoring);
 
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для SMTP и системных запросов
-  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
-    return next();
-  }
-  fileUploadMonitoring(req, res, next);
-});
-
-app.use((req, res, next) => {
-  // Пропускаем мониторинг для SMTP и системных запросов
-  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
-    return next();
-  }
-  rateLimitMonitoring(req, res, next);
-});
-
-// Глобальный rate limit (на все API) - исключаем SMTP
+// Глобальный rate limit (на все API)
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Пропускаем SMTP и системные запросы
-    return req.path.includes('smtp') || req.path.includes('email') || req.path === '/health';
+    // Пропускаем login из глобального rate limiting для SMTP
+    return req.path === '/api/auth/login';
   }
 });
 app.use('/api/', apiLimiter);
@@ -113,8 +77,8 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   skip: (req) => {
-    // Пропускаем SMTP и системные запросы
-    return req.path.includes('smtp') || req.path.includes('email') || req.path === '/health';
+    // Пропускаем login из rate limiting для SMTP
+    return req.path === '/api/auth/login';
   }
 });
 app.use('/api/auth', authLimiter);
@@ -147,6 +111,7 @@ function shouldBypassCsrf(req) {
   const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
+  const isLoginRoute = req.path === '/api/auth/login'; // Добавляем проверку для login
 
   console.log('CSRF bypass check:', {
     path: req.path,
@@ -155,7 +120,8 @@ function shouldBypassCsrf(req) {
     isMultipart,
     isUpload,
     isCsrfTokenEndpoint,
-    isTrainingRoute
+    isTrainingRoute,
+    isLoginRoute
   });
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
@@ -173,6 +139,10 @@ function shouldBypassCsrf(req) {
   }
   if (isAuthRoute) {
     console.log('CSRF bypassed: auth route');
+    return true;
+  }
+  if (isLoginRoute) {
+    console.log('CSRF bypassed: login route specifically');
     return true;
   }
   if (isTrainingRoute && hasBearer) {
