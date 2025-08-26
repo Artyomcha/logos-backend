@@ -110,22 +110,29 @@ function shouldBypassCsrf(req) {
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
   const isUserRoute = req.path.startsWith('/api/user/');
-  // Убираем лишнее логирование
+  const is2FARoute = req.path === '/api/auth/login' || req.path === '/api/auth/verify-2fa';
+  const isMultipartWithBearer = isMultipart && hasBearer;
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
   if (isApiKey) return true;
   if (isMultipart && isUpload) return true;
   if (isUpload && hasBearer) return true; // Добавляем байпас для всех upload операций с JWT
   if (isCsrfTokenEndpoint) return true;
-  if (isAuthRoute) return true;
+  if (isAuthRoute) return true; // Все auth роуты без CSRF
+  if (is2FARoute) return true; // 2FA роуты без CSRF
   if (isTrainingRoute && hasBearer) return true;
   if (isUserRoute && hasBearer) return true;
+  if (isMultipartWithBearer) return true; // Все multipart запросы с JWT без CSRF
   
   return false;
 }
 
 app.use((req, res, next) => {
-  if (shouldBypassCsrf(req)) return next();
+  console.log('CSRF check for:', req.method, req.path, 'shouldBypass:', shouldBypassCsrf(req));
+  if (shouldBypassCsrf(req)) {
+    console.log('CSRF bypassed for:', req.path);
+    return next();
+  }
   return csrfProtection(req, res, next);
 });
 
