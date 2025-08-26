@@ -12,7 +12,7 @@ console.log('========================');
 // Создаем transporter с портом 587 (STARTTLS) для Gmail
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
+  port: 587,
   secure: false,
   requireTLS: true,
   auth: {
@@ -31,9 +31,7 @@ async function send2FACode(to, code) {
     });
     return result;
   } catch (error) {
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH' || error.code === 'EINVALIDUSER' || error.code === 'EINVALIDPASS') {
-      throw new Error('SMTP_UNAVAILABLE');
-    }
+    console.error('Error sending 2FA code:', error);
     throw error;
   }
 }

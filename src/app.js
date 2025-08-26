@@ -60,22 +60,14 @@ app.use(securityMonitoring);
 app.use(fileUploadMonitoring);
 app.use(rateLimitMonitoring);
 
-// Глобальный rate limit (на все API) - исключаем email и 2FA
+// Глобальный rate limit (на все API)
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Пропускаем email, SMTP и 2FA запросы
-    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp';
-  }
+  legacyHeaders: false
 });
 app.use('/api/', apiLimiter);
-
-// Исключаем 2FA роуты из rate limiting
-app.use('/api/auth/login', (req, res, next) => next());
-app.use('/api/auth/verify-2fa', (req, res, next) => next());
 
 // Убираем rate limiter для auth маршрутов, чтобы не блокировать SMTP
 
@@ -95,9 +87,7 @@ const csrfProtection = csrf({
     sameSite: 'none',
     secure: true,
     name: 'csrf'
-  },
-  ignoreMethods: ['POST'],
-  ignoreRoutes: ['/api/auth/login', '/api/auth/verify-2fa']
+  }
 });
 
 // Условный байпас CSRF для машинных клиентов (n8n, мобильные, интеграции)
@@ -110,26 +100,23 @@ function shouldBypassCsrf(req) {
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
   const isUserRoute = req.path.startsWith('/api/user/');
-  const is2FARoute = req.path === '/api/auth/login' || req.path === '/api/auth/verify-2fa';
-  const isMultipartWithBearer = isMultipart && hasBearer;
+  // Убираем лишнее логирование
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
   if (isApiKey) return true;
   if (isMultipart && isUpload) return true;
   if (isUpload && hasBearer) return true; // Добавляем байпас для всех upload операций с JWT
   if (isCsrfTokenEndpoint) return true;
-  if (isAuthRoute) return true; // Все auth роуты без CSRF
-  if (is2FARoute) return true; // 2FA роуты без CSRF
+  if (isAuthRoute) return true;
   if (isTrainingRoute && hasBearer) return true;
   if (isUserRoute && hasBearer) return true;
-  if (isMultipartWithBearer) return true; // Все multipart запросы с JWT без CSRF
   
   return false;
 }
 
-// Временно отключаем CSRF защиту для всех запросов
 app.use((req, res, next) => {
-  return next();
+  if (shouldBypassCsrf(req)) return next();
+  return csrfProtection(req, res, next);
 });
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
