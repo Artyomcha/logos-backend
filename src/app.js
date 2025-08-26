@@ -24,7 +24,11 @@ const trainingRoutes = require('./routes/training');
 const DatabaseService = require('./services/databaseService');
 
 const app = express();
-app.set('trust proxy', 1);
+// Отключаем trust proxy для SMTP
+app.set('trust proxy', (ip) => {
+  // Не доверяем прокси для SMTP соединений
+  return false;
+});
 
 // Helmet (базовые заголовки безопасности) - применяем только к веб-запросам, не к SMTP
 app.use((req, res, next) => {
@@ -39,29 +43,57 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// CORS (ограничьте origin)
-const allowedOrigins = [
-  'https://logos-tech.ru',
-  'https://www.logos-tech.ru',
-  // Добавьте другие продакшен домены если нужно
-];
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
-}));
+// CORS (ограничьте origin) - исключаем SMTP
+app.use((req, res, next) => {
+  // Пропускаем CORS для SMTP и системных запросов
+  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
+    return next();
+  }
+  
+  const allowedOrigins = [
+    'https://logos-tech.ru',
+    'https://www.logos-tech.ru',
+    // Добавьте другие продакшен домены если нужно
+  ];
+  
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
+  })(req, res, next);
+});
 
 app.use(express.json());
 app.use(cookieParser());
 
-// Подключаем мониторинг безопасности
-app.use(securityMonitoring);
-app.use(fileUploadMonitoring);
-app.use(rateLimitMonitoring);
+// Подключаем мониторинг безопасности - исключаем SMTP
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для SMTP и системных запросов
+  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
+    return next();
+  }
+  securityMonitoring(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для SMTP и системных запросов
+  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
+    return next();
+  }
+  fileUploadMonitoring(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для SMTP и системных запросов
+  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
+    return next();
+  }
+  rateLimitMonitoring(req, res, next);
+});
 
 // Глобальный rate limit (на все API) - исключаем SMTP
 const apiLimiter = rateLimit({
@@ -79,7 +111,11 @@ app.use('/api/', apiLimiter);
 // Усиленный лимит на авторизацию/брутфорс-чувствительные роуты
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10
+  max: 10,
+  skip: (req) => {
+    // Пропускаем SMTP и системные запросы
+    return req.path.includes('smtp') || req.path.includes('email') || req.path === '/health';
+  }
 });
 app.use('/api/auth', authLimiter);
 
@@ -285,6 +321,17 @@ app.post('/api/companies', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('Logos AI backend is running');
+});
+
+// Тестовый endpoint для проверки SMTP
+app.get('/test-smtp', async (req, res) => {
+  try {
+    const { send2FACode } = require('./services/email');
+    await send2FACode('test@example.com', '123456');
+    res.json({ message: 'SMTP test successful' });
+  } catch (error) {
+    res.status(500).json({ message: 'SMTP test failed', error: error.message });
+  }
 });
 
 const PORT = process.env.PORT || 5000;
