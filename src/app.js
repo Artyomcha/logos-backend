@@ -36,6 +36,9 @@ app.use((req, res, next) => {
     return next();
   }
   
+  // Временно отключаем Helmet для всех запросов
+  return next();
+  
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
   })(req, res, next);
@@ -98,7 +101,8 @@ const apiLimiter = rateLimit({
     return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp';
   }
 });
-app.use('/api/', apiLimiter);
+// Временно отключаем rate limiting
+// app.use('/api/', apiLimiter);
 
 // Убираем rate limiter для auth маршрутов, чтобы не блокировать SMTP
 
@@ -145,10 +149,11 @@ function shouldBypassCsrf(req) {
   return false;
 }
 
-app.use((req, res, next) => {
-  if (shouldBypassCsrf(req)) return next();
-  return csrfProtection(req, res, next);
-});
+// Временно отключаем CSRF защиту
+// app.use((req, res, next) => {
+//   if (shouldBypassCsrf(req)) return next();
+//   return csrfProtection(req, res, next);
+// });
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {

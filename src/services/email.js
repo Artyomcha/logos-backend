@@ -12,7 +12,7 @@ console.log('========================');
 // Создаем transporter с портом 465 (SSL) для Gmail
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT, // Используем порт 465 для SSL
+  port: 465, // Используем порт 465 для SSL
   secure: true, // true для SSL
   auth: {
     user: process.env.SMTP_USER,
@@ -21,7 +21,10 @@ const transporter = nodemailer.createTransport({
   // Добавляем таймауты
   connectionTimeout: 10000,
   greetingTimeout: 10000,
-  socketTimeout: 10000
+  socketTimeout: 10000,
+  // Добавляем debug
+  debug: true,
+  logger: true
 });
 
 async function send2FACode(to, code) {
