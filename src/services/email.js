@@ -2,38 +2,33 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // Проверяем наличие SMTP настроек
-console.log('SMTP Configuration:', {
-  host: process.env.SMTP_HOST || 'NOT_SET',
-  port: process.env.SMTP_PORT || 'NOT_SET',
-  user: process.env.SMTP_USER || 'NOT_SET',
-  pass: process.env.SMTP_PASS ? 'SET' : 'NOT_SET'
-});
+console.log('=== SMTP CONFIGURATION ===');
+console.log('SMTP_HOST:', process.env.SMTP_HOST);
+console.log('SMTP_PORT:', process.env.SMTP_PORT);
+console.log('SMTP_USER:', process.env.SMTP_USER);
+console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT_SET');
+console.log('========================');
 
-// Создаем transporter с таймаутами
+// Создаем transporter с базовыми настройками
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false, // false для порта 587 (STARTTLS)
-  requireTLS: true, // Требуем TLS
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  },
-  // Добавляем таймауты чтобы не зависать
-  connectionTimeout: 10000, // 10 секунд
-  greetingTimeout: 10000,   // 10 секунд
-  socketTimeout: 10000      // 10 секунд
+  }
 });
 
 async function send2FACode(to, code) {
-  console.log('Attempting to send 2FA code to:', to);
-  console.log('SMTP settings:', {
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    user: process.env.SMTP_USER
-  });
+  console.log('=== SENDING 2FA CODE ===');
+  console.log('To:', to);
+  console.log('From:', process.env.SMTP_USER);
+  console.log('Host:', process.env.SMTP_HOST);
+  console.log('Port:', process.env.SMTP_PORT);
   
   try {
+    console.log('Attempting to send email...');
     const result = await transporter.sendMail({
       from: process.env.SMTP_USER,
       to,
@@ -43,13 +38,12 @@ async function send2FACode(to, code) {
     console.log('Email sent successfully:', result.messageId);
     return result;
   } catch (error) {
-    console.error('SMTP error details:', {
-      code: error.code,
-      command: error.command,
-      response: error.response,
-      responseCode: error.responseCode,
-      message: error.message
-    });
+    console.error('=== SMTP ERROR ===');
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error command:', error.command);
+    console.error('Error response:', error.response);
+    console.error('==================');
     
     // Если SMTP недоступен, возвращаем специальную ошибку
     if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH') {
@@ -60,7 +54,6 @@ async function send2FACode(to, code) {
 }
 
 async function sendLoginCredentials(to, email, password, companyName, firstName, lastName) {
-  console.log('Sending login credentials:', { to, email, companyName });
   try {
     await transporter.sendMail({
       from: process.env.SMTP_USER,
@@ -104,7 +97,6 @@ Email: ${email}
 Если у вас возникли вопросы, обратитесь к администратору системы.
       `,
     });
-    console.log('Login credentials sent successfully to:', to);
   } catch (error) {
     console.error('Error sending login credentials:', error);
     throw error;
@@ -112,7 +104,6 @@ Email: ${email}
 }
 
 async function sendPasswordResetCode(to, code) {
-  console.log('Sending password reset code:', { to, code });
   try {
     await transporter.sendMail({
       from: process.env.SMTP_USER,
@@ -142,7 +133,6 @@ async function sendPasswordResetCode(to, code) {
 Важно: Код действителен в течение 10 минут. Если вы не запрашивали сброс пароля, проигнорируйте это письмо.
       `,
     });
-    console.log('Password reset code sent successfully to:', to);
   } catch (error) {
     console.error('Error sending password reset code:', error);
     throw error;
