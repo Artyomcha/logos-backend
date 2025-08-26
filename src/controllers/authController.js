@@ -169,12 +169,31 @@ exports.login = async (req, res) => {
     console.log('Generated 2FA code for', email, ':', code);
     codes.set(email, { code, companyName: foundCompany });
     console.log('Stored codes:', Array.from(codes.entries()));
-    await send2FACode(email, code);
     
-    res.json({ 
-      message: 'Код отправлен на email',
-      companyName: foundCompany
-    });
+    try {
+      await send2FACode(email, code);
+      res.json({ 
+        message: 'Код отправлен на email',
+        companyName: foundCompany
+      });
+    } catch (emailError) {
+      console.error('SMTP error, but 2FA code generated:', emailError);
+      // Если SMTP не работает, возвращаем код в ответе для демо
+      if (emailError.message === 'SMTP_UNAVAILABLE') {
+        res.json({ 
+          message: 'SMTP недоступен. Используйте код для демо',
+          demoCode: code,
+          companyName: foundCompany
+        });
+      } else {
+        // Для других ошибок SMTP также возвращаем demo код
+        res.json({ 
+          message: 'Ошибка отправки email. Используйте код для демо',
+          demoCode: code,
+          companyName: foundCompany
+        });
+      }
+    }
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Ошибка при входе' });

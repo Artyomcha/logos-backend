@@ -9,20 +9,29 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  // Добавляем таймауты для предотвращения зависания
+  connectionTimeout: 10000, // 10 секунд на подключение
+  greetingTimeout: 10000,   // 10 секунд на приветствие
+  socketTimeout: 10000,     // 10 секунд на сокет
 });
 
 async function send2FACode(to, code) {
   console.log('Sending 2FA code:', { to, code });
   try {
-  await transporter.sendMail({
-    from: process.env.SMTP_USER,
-    to,
-    subject: 'Your verification code',
-    text: `Your verification code: ${code}`,
-  });
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to,
+      subject: 'Your verification code',
+      text: `Your verification code: ${code}`,
+    });
     console.log('2FA code sent successfully to:', to);
   } catch (error) {
     console.error('Error sending 2FA code:', error);
+    // Если SMTP недоступен, не блокируем процесс входа
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+      console.log('SMTP timeout/connection refused, continuing without email');
+      throw new Error('SMTP_UNAVAILABLE');
+    }
     throw error;
   }
 }
