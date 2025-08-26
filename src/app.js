@@ -32,7 +32,7 @@ app.set('trust proxy', 1);
 // Helmet (базовые заголовки безопасности) - исключаем email
 app.use((req, res, next) => {
   // Пропускаем Helmet для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
     return next();
   }
   
@@ -65,7 +65,7 @@ app.use(cookieParser());
 // Подключаем мониторинг безопасности - исключаем email
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
     return next();
   }
   securityMonitoring(req, res, next);
@@ -73,7 +73,7 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
     return next();
   }
   fileUploadMonitoring(req, res, next);
@@ -81,7 +81,7 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   // Пропускаем мониторинг для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp') {
     return next();
   }
   rateLimitMonitoring(req, res, next);
@@ -95,7 +95,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => {
     // Пропускаем email и SMTP запросы
-    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/');
+    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/') || req.path === '/test-smtp';
   }
 });
 app.use('/api/', apiLimiter);
@@ -277,7 +277,7 @@ app.get('/test-smtp', async (req, res) => {
   try {
     const { send2FACode } = require('./services/email');
     console.log('Testing SMTP connection...');
-    await send2FACode('test@example.com', '123456');
+    await send2FACode('artyomswim@gmail.com', '123456');
     res.json({ message: 'SMTP test successful' });
   } catch (error) {
     console.error('SMTP test failed:', error);
