@@ -26,10 +26,18 @@ const DatabaseService = require('./services/databaseService');
 const app = express();
 app.set('trust proxy', 1);
 
-// Helmet (базовые заголовки безопасности)
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
+// Helmet (базовые заголовки безопасности) - применяем только к веб-запросам, не к SMTP
+app.use((req, res, next) => {
+  // Пропускаем Helmet для SMTP и системных запросов
+  if (req.path.includes('smtp') || req.path.includes('email') || req.path === '/health') {
+    return next();
+  }
+  
+  // Применяем Helmet только к веб-запросам
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })(req, res, next);
+});
 
 // CORS (ограничьте origin)
 const allowedOrigins = [
@@ -55,12 +63,16 @@ app.use(securityMonitoring);
 app.use(fileUploadMonitoring);
 app.use(rateLimitMonitoring);
 
-// Глобальный rate limit (на все API)
+// Глобальный rate limit (на все API) - исключаем SMTP
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => {
+    // Пропускаем SMTP и системные запросы
+    return req.path.includes('smtp') || req.path.includes('email') || req.path === '/health';
+  }
 });
 app.use('/api/', apiLimiter);
 

@@ -9,6 +9,7 @@ console.log('SMTP Configuration:', {
   pass: process.env.SMTP_PASS ? 'set' : 'not set'
 });
 
+// Создаем transporter с базовыми настройками (как было раньше)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
@@ -16,11 +17,7 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  },
-  // Добавляем таймауты для предотвращения зависания
-  connectionTimeout: 10000, // 10 секунд на подключение
-  greetingTimeout: 10000,   // 10 секунд на приветствие
-  socketTimeout: 10000,     // 10 секунд на сокет
+  }
 });
 
 async function send2FACode(to, code) {
@@ -35,11 +32,6 @@ async function send2FACode(to, code) {
     console.log('2FA code sent successfully to:', to);
   } catch (error) {
     console.error('Error sending 2FA code:', error);
-    // Если SMTP недоступен, не блокируем процесс входа
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-      console.log('SMTP timeout/connection refused, continuing without email');
-      throw new Error('SMTP_UNAVAILABLE');
-    }
     throw error;
   }
 }
