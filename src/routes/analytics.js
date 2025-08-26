@@ -24,9 +24,9 @@ router.get('/department', auth, async (req, res) => {
         date,
         AVG(call_duration_seconds) as avg_duration
       FROM department_analytics 
-      WHERE date >= CURRENT_DATE - INTERVAL '7 days'
       GROUP BY date 
-      ORDER BY date
+      ORDER BY date DESC
+      LIMIT 7
     `);
     
     // 3. Количество успешных звонков (кольцевая диаграмма)
@@ -144,9 +144,8 @@ router.get('/call-quality', auth, async (req, res) => {
         AVG(stages_completed::DECIMAL / total_stages::DECIMAL * 100) as completion_rate,
         AVG(total_stages - stages_completed) as missed_stages
       FROM call_quality 
-      WHERE date >= CURRENT_DATE - INTERVAL '7 days'
       GROUP BY date 
-      ORDER BY date
+      ORDER BY date DESC
     `);
     
     // 3. Использование ключевых фраз
