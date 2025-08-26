@@ -64,22 +64,14 @@ const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Пропускаем login из глобального rate limiting для SMTP
-    return req.path === '/api/auth/login';
-  }
+  legacyHeaders: false
 });
 app.use('/api/', apiLimiter);
 
 // Усиленный лимит на авторизацию/брутфорс-чувствительные роуты
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
-  skip: (req) => {
-    // Пропускаем login из rate limiting для SMTP
-    return req.path === '/api/auth/login';
-  }
+  max: 10
 });
 app.use('/api/auth', authLimiter);
 
@@ -111,8 +103,6 @@ function shouldBypassCsrf(req) {
   const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
-  const isLoginRoute = req.path === '/api/auth/login'; // Добавляем проверку для login
-
   console.log('CSRF bypass check:', {
     path: req.path,
     hasBearer,
@@ -120,8 +110,7 @@ function shouldBypassCsrf(req) {
     isMultipart,
     isUpload,
     isCsrfTokenEndpoint,
-    isTrainingRoute,
-    isLoginRoute
+    isTrainingRoute
   });
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
@@ -141,10 +130,7 @@ function shouldBypassCsrf(req) {
     console.log('CSRF bypassed: auth route');
     return true;
   }
-  if (isLoginRoute) {
-    console.log('CSRF bypassed: login route specifically');
-    return true;
-  }
+
   if (isTrainingRoute && hasBearer) {
     console.log('CSRF bypassed: Training route with JWT token');
     return true;
