@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 const SAFE_AUDIO_MIME = new Set(['audio/wav','audio/x-wav','audio/mpeg','audio/ogg','audio/webm','audio/mp4']);
-const MAX_AUDIO_SIZE = 50 * 1024 * 1024;
+const MAX_AUDIO_SIZE = 500 * 1024 * 1024; // Увеличиваем до 100MB
 
 function hasDoubleExtension(filename) {
   const parts = filename.split('.');

@@ -10,7 +10,7 @@ const combinedAuth = require('../middleware/combinedAuth');
 
 const SAFE_AUDIO_MIME = new Set(['audio/wav','audio/x-wav','audio/mpeg','audio/ogg','audio/webm','audio/mp4']);
 const SAFE_DOC_MIME = new Set(['application/pdf','image/png','image/jpeg']);
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // Увеличиваем до 100MB
 
 function hasDoubleExtension(filename) {
   const parts = filename.split('.');
@@ -42,7 +42,7 @@ const fileStorage = multer.diskStorage({
 
 const upload = multer({
   storage: fileStorage,
-  limits: { fileSize: MAX_FILE_SIZE, files: 1, parts: 2 },
+  limits: { fileSize: MAX_FILE_SIZE, files: 1, parts: 10 }, // Увеличиваем parts до 10
   fileFilter: (req, file, cb) => {
     const mimetype = (file.mimetype || '').toLowerCase();
     const name = file.originalname || '';

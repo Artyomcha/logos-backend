@@ -58,7 +58,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 app.use(cookieParser());
 
 // Подключаем мониторинг безопасности - исключаем email
@@ -135,6 +136,7 @@ function shouldBypassCsrf(req) {
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
   if (isApiKey) return true;
   if (isMultipart && isUpload) return true;
+  if (isUpload && hasBearer) return true; // Добавляем байпас для всех upload операций с JWT
   if (isCsrfTokenEndpoint) return true;
   if (isAuthRoute) return true;
   if (isTrainingRoute && hasBearer) return true;
