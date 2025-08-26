@@ -1,5 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const csrf = require('csurf');
 require('dotenv').config();
 const path = require('path');
 
@@ -19,8 +23,102 @@ const trainingRoutes = require('./routes/training');
 const DatabaseService = require('./services/databaseService');
 
 const app = express();
-app.use(cors());
+app.set('trust proxy', 1);
+
+// Helmet (базовые заголовки безопасности)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// CORS (ограничьте origin)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://logos-tech.ru',
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
+}));
+
 app.use(express.json());
+app.use(cookieParser());
+
+// Глобальный rate limit (на все API)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', apiLimiter);
+
+// Усиленный лимит на авторизацию/брутфорс-чувствительные роуты
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10
+});
+app.use('/api/auth', authLimiter);
+
+// Лимит на загрузку файлов (чтобы не DDOS-ить I/O)
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30
+});
+app.use('/api/upload', uploadLimiter);
+app.use('/api/training/upload-audio', uploadLimiter);
+
+// CSRF защита (cookie-based) — применяем для браузерных запросов
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
+});
+
+// Условный байпас CSRF для машинных клиентов (n8n, мобильные, интеграции)
+function shouldBypassCsrf(req) {
+  const hasBearer = Boolean(req.headers.authorization);
+  const isApiKey = hasBearer && req.headers.authorization.includes('n8n_automation_key_2024_universal');
+  const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
+  const isUpload = req.path.startsWith('/api/upload') || req.path.startsWith('/api/training/upload-audio');
+
+  // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
+  if (isApiKey) return true;
+  if (isMultipart && isUpload) return true;
+  return false;
+}
+
+app.use((req, res, next) => {
+  if (shouldBypassCsrf(req)) return next();
+  return csrfProtection(req, res, next);
+});
+
+// Эндпоинт для выдачи CSRF токена фронту
+app.get('/api/csrf-token', (req, res) => {
+  // Если маршрут попал под байпас — токена нет; фронту он нужен только при включенном CSRF
+  if (typeof req.csrfToken === 'function') {
+    return res.json({ csrfToken: req.csrfToken() });
+  }
+  return res.json({ csrfToken: null });
+});
+
+// Обработка ошибок CSRF
+app.use((err, req, res, next) => {
+  if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ 
+      message: 'CSRF токен недействителен или отсутствует',
+      error: 'CSRF_ERROR'
+    });
+  }
+  next(err);
+});
 
 // Serve company-specific static files with proper routing
 app.use('/uploads/companies/:company/avatars', (req, res, next) => {

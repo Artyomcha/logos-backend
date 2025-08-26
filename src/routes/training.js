@@ -7,10 +7,24 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Настройка multer для загрузки аудио файлов
+const SAFE_AUDIO_MIME = new Set(['audio/wav','audio/x-wav','audio/mpeg','audio/ogg','audio/webm','audio/mp4']);
+const MAX_AUDIO_SIZE = 50 * 1024 * 1024;
+
+function hasDoubleExtension(filename) {
+  const parts = filename.split('.');
+  return parts.length > 2;
+}
+function getSafeAudioExt(original) {
+  const ext = path.extname(original || '').toLowerCase();
+  const allowed = new Set(['.wav','.mp3','.ogg','.webm','.m4a']);
+  return allowed.has(ext) ? ext : '';
+}
+
+// Безопасная настройка multer для загрузки аудио файлов
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const companyName = req.headers['x-company-name'] || req.user.companyName;
+    const rawCompany = req.headers['x-company-name'] || req.user.companyName || 'general';
+    const companyName = String(rawCompany).replace(/[^a-zA-Z0-9_-]/g,'');
     const uploadDir = path.join('/app/uploads/companies', companyName, 'training');
     
     // Создаем директорию, если её нет
@@ -21,26 +35,25 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const caseId = req.params.caseId;
-    const attemptNumber = req.params.attemptNumber;
+    const caseId = Number(req.body.caseId || req.params.caseId || 0);
+    const attemptNumber = Number(req.body.attemptNumber || req.params.attemptNumber || 0);
     const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    cb(null, `case_${caseId}_attempt_${attemptNumber}_${timestamp}${ext}`);
+    const safeExt = getSafeAudioExt(file.originalname);
+    cb(null, `case_${caseId}_attempt_${attemptNumber}_${timestamp}${safeExt}`);
   }
 });
 
-const upload = multer({ 
-  storage: storage,
-  fileFilter: function (req, file, cb) {
-    // Разрешаем только аудио файлы
-    if (file.mimetype.startsWith('audio/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Только аудио файлы разрешены'), false);
-    }
-  },
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB максимум
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_AUDIO_SIZE, files: 1, parts: 3 },
+  fileFilter: (req, file, cb) => {
+    const mimetype = (file.mimetype || '').toLowerCase();
+    const name = file.originalname || '';
+    if (hasDoubleExtension(name)) return cb(new Error('Запрещены двойные расширения'), false);
+    if (!SAFE_AUDIO_MIME.has(mimetype)) return cb(new Error('Только аудио файлы разрешены'), false);
+    const ext = getSafeAudioExt(name);
+    if (!ext) return cb(new Error('Недопустимое аудио-расширение'), false);
+    cb(null, true);
   }
 });
 
@@ -491,6 +504,28 @@ router.post('/get-evaluation', trainingAuth, async (req, res) => {
     console.error('Error getting evaluation details:', error);
     res.status(500).json({ message: 'Ошибка получения деталей оценки' });
   }
+});
+
+// Обработка ошибок multer для training
+router.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'Аудио файл слишком большой' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ message: 'Слишком много файлов' });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: 'Неожиданное поле файла' });
+    }
+    return res.status(400).json({ message: 'Ошибка загрузки аудио файла' });
+  }
+  
+  if (error.message) {
+    return res.status(400).json({ message: error.message });
+  }
+  
+  next(error);
 });
 
 module.exports = router;

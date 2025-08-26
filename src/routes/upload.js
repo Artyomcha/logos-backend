@@ -8,11 +8,25 @@ const auth = require('../middleware/auth');
 const combinedAuth = require('../middleware/combinedAuth');
 
 
-// Простое локальное хранилище для файлов
+const SAFE_AUDIO_MIME = new Set(['audio/wav','audio/x-wav','audio/mpeg','audio/ogg','audio/webm','audio/mp4']);
+const SAFE_DOC_MIME = new Set(['application/pdf','image/png','image/jpeg']);
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function hasDoubleExtension(filename) {
+  const parts = filename.split('.');
+  return parts.length > 2;
+}
+function getSafeExt(original) {
+  const ext = path.extname(original || '').toLowerCase();
+  const allowed = new Set(['.wav','.mp3','.ogg','.webm','.m4a','.pdf','.png','.jpg','.jpeg']);
+  return allowed.has(ext) ? ext : '';
+}
+
+// Безопасное локальное хранилище для файлов
 const fileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const companyName = req.user?.companyName || 'general';
-    // Используем Railway volume path для постоянного хранения
+    const rawCompany = req.user?.companyName || 'general';
+    const companyName = String(rawCompany).replace(/[^a-zA-Z0-9_-]/g,''); // sanitize
     const uploadPath = path.join('/app/uploads/companies', companyName, 'files');
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -20,14 +34,29 @@ const fileStorage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    const safeExt = getSafeExt(file.originalname);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'file-' + uniqueSuffix + safeExt);
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: fileStorage,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+  limits: { fileSize: MAX_FILE_SIZE, files: 1, parts: 2 },
+  fileFilter: (req, file, cb) => {
+    const mimetype = (file.mimetype || '').toLowerCase();
+    const name = file.originalname || '';
+    if (hasDoubleExtension(name)) return cb(new Error('Запрещены двойные расширения'), false);
+
+    const isAudio = SAFE_AUDIO_MIME.has(mimetype);
+    const isDocImg = SAFE_DOC_MIME.has(mimetype);
+    if (!isAudio && !isDocImg) return cb(new Error('Недопустимый тип файла'), false);
+
+    const ext = getSafeExt(name);
+    if (!ext) return cb(new Error('Недопустимое расширение файла'), false);
+
+    cb(null, true);
+  }
 });
 
 // Загрузка файла
@@ -55,6 +84,28 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
     console.error('Ошибка при загрузке файла:', err);
     res.status(500).json({ message: 'Ошибка сервера', error: err.message });
   }
+});
+
+// Обработка ошибок multer
+router.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'Файл слишком большой' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ message: 'Слишком много файлов' });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: 'Неожиданное поле файла' });
+    }
+    return res.status(400).json({ message: 'Ошибка загрузки файла' });
+  }
+  
+  if (error.message) {
+    return res.status(400).json({ message: error.message });
+  }
+  
+  next(error);
 });
 
 // Получить список файлов
