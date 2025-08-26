@@ -9,11 +9,11 @@ console.log('SMTP_USER:', process.env.SMTP_USER);
 console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT_SET');
 console.log('========================');
 
-// Создаем transporter с SSL (порт 465)
+// Создаем transporter с базовыми настройками
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT, // Используем порт 465 для SSL
-  secure: true, // Включаем SSL
+  port: process.env.SMTP_PORT,
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
