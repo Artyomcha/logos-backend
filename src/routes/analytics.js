@@ -24,9 +24,7 @@ router.get('/department', auth, async (req, res) => {
         date,
         AVG(call_duration_seconds) as avg_duration
       FROM (
-        SELECT 
-          date,
-          AVG(call_duration_seconds) as avg_duration
+        SELECT date, call_duration_seconds
         FROM department_analytics 
         GROUP BY date 
         ORDER BY date DESC
@@ -150,16 +148,12 @@ router.get('/call-quality', auth, async (req, res) => {
         AVG(stages_completed::DECIMAL / total_stages::DECIMAL * 100) as completion_rate,
         AVG(total_stages - stages_completed) as missed_stages
       FROM (
-        SELECT 
-          date,
-          stages_completed,
-          total_stages
+        SELECT date, stages_completed, total_stages
         FROM call_quality 
-        GROUP BY date, stages_completed, total_stages
+        GROUP BY date 
         ORDER BY date DESC
         LIMIT 7
       ) subquery
-      GROUP BY date 
       ORDER BY date ASC
     `);
     
