@@ -139,68 +139,28 @@ function shouldBypassCsrf(req) {
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
   const isUserRoute = req.path.startsWith('/api/user/');
-  console.log('CSRF bypass check:', {
-    path: req.path,
-    hasBearer,
-    isApiKey,
-    isMultipart,
-    isUpload,
-    isCsrfTokenEndpoint,
-    isTrainingRoute,
-    isUserRoute
-  });
+  // Убираем лишнее логирование
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
-  if (isApiKey) {
-    console.log('CSRF bypassed: API key detected');
-    return true;
-  }
-  if (isMultipart && isUpload) {
-    console.log('CSRF bypassed: Multipart upload detected');
-    return true;
-  }
-  if (isCsrfTokenEndpoint) {
-    console.log('CSRF bypassed: CSRF token endpoint');
-    return true;
-  }
-  if (isAuthRoute) {
-    console.log('CSRF bypassed: auth route');
-    return true;
-  }
-
-
-  if (isTrainingRoute && hasBearer) {
-    console.log('CSRF bypassed: Training route with JWT token');
-    return true;
-  }
-  if (isUserRoute && hasBearer) {
-    console.log('CSRF bypassed: User route with JWT token');
-    return true;
-  }
+  if (isApiKey) return true;
+  if (isMultipart && isUpload) return true;
+  if (isCsrfTokenEndpoint) return true;
+  if (isAuthRoute) return true;
+  if (isTrainingRoute && hasBearer) return true;
+  if (isUserRoute && hasBearer) return true;
   
-  console.log('CSRF protection enabled for this request');
   return false;
 }
 
 app.use((req, res, next) => {
   if (shouldBypassCsrf(req)) return next();
-  
-  console.log('Applying CSRF protection to:', req.method, req.path);
-  console.log('Cookies:', req.headers.cookie);
-  console.log('CSRF token in headers:', req.headers['x-csrf-token']);
-  
   return csrfProtection(req, res, next);
 });
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {
-  console.log('CSRF token request received');
-  console.log('Cookies in CSRF request:', req.headers.cookie);
-  
-  // Применяем CSRF middleware только для этого эндпоинта
   return csrfProtection(req, res, (err) => {
     if (err) {
-      console.error('CSRF token generation error:', err);
       return res.status(403).json({ 
         message: 'Ошибка получения CSRF токена',
         error: 'CSRF_ERROR'
@@ -208,8 +168,6 @@ app.get('/api/csrf-token', (req, res) => {
     }
     
     const token = req.csrfToken();
-    console.log('CSRF token generated successfully:', token.substring(0, 10) + '...');
-    console.log('Response cookies:', res.getHeaders()['set-cookie']);
     return res.json({ csrfToken: token });
   });
 });
