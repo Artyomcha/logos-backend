@@ -62,8 +62,18 @@ const upload = multer({
 // Загрузка файла
 router.post('/', auth, upload.single('file'), async (req, res) => {
   try {
-    console.log('File upload request for company:', req.user.companyName);
-    console.log('File received:', req.file ? req.file.originalname : 'no file');
+    console.log('=== FILE UPLOAD REQUEST ===');
+    console.log('Company:', req.user.companyName);
+    console.log('User ID:', req.user.id);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('File received:', req.file ? {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      filename: req.file.filename
+    } : 'no file');
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('==========================');
     
     if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });
     
@@ -88,6 +98,14 @@ router.post('/', auth, upload.single('file'), async (req, res) => {
 
 // Обработка ошибок multer
 router.use((error, req, res, next) => {
+  console.log('=== MULTER ERROR ===');
+  console.log('Error type:', error.constructor.name);
+  console.log('Error message:', error.message);
+  console.log('Error code:', error.code);
+  console.log('Request headers:', req.headers);
+  console.log('Request body keys:', Object.keys(req.body));
+  console.log('===================');
+  
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ message: 'Файл слишком большой' });
@@ -98,7 +116,10 @@ router.use((error, req, res, next) => {
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({ message: 'Неожиданное поле файла' });
     }
-    return res.status(400).json({ message: 'Ошибка загрузки файла' });
+    if (error.code === 'LIMIT_PART_COUNT') {
+      return res.status(400).json({ message: 'Слишком много частей в запросе' });
+    }
+    return res.status(400).json({ message: 'Ошибка загрузки файла', code: error.code });
   }
   
   if (error.message) {
