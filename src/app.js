@@ -44,29 +44,22 @@ app.use((req, res, next) => {
   })(req, res, next);
 });
 
-// CORS (ограничьте origin) - исключаем email
-app.use((req, res, next) => {
-  // Пропускаем CORS для email и SMTP
-  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail') || req.path.startsWith('/api/auth/')) {
-    return next();
-  }
-  
-  const allowedOrigins = [
-    'https://logos-tech.ru',
-    'https://www.logos-tech.ru',
-    // Добавьте другие продакшен домены если нужно
-  ];
-  
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
-  })(req, res, next);
-});
+// CORS (ограничьте origin) - применяем ко всем запросам
+const allowedOrigins = [
+  'https://logos-tech.ru',
+  'https://www.logos-tech.ru',
+  // Добавьте другие продакшен домены если нужно
+];
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
+}));
 
 app.use(express.json());
 app.use(cookieParser());
