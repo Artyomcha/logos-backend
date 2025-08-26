@@ -88,10 +88,32 @@ function shouldBypassCsrf(req) {
   const isApiKey = hasBearer && req.headers.authorization.includes('n8n_automation_key_2024_universal');
   const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
   const isUpload = req.path.startsWith('/api/upload') || req.path.startsWith('/api/training/upload-audio');
+  const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
+
+  console.log('CSRF bypass check:', {
+    path: req.path,
+    hasBearer,
+    isApiKey,
+    isMultipart,
+    isUpload,
+    isCsrfTokenEndpoint
+  });
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
-  if (isApiKey) return true;
-  if (isMultipart && isUpload) return true;
+  if (isApiKey) {
+    console.log('CSRF bypassed: API key detected');
+    return true;
+  }
+  if (isMultipart && isUpload) {
+    console.log('CSRF bypassed: Multipart upload detected');
+    return true;
+  }
+  if (isCsrfTokenEndpoint) {
+    console.log('CSRF bypassed: CSRF token endpoint');
+    return true;
+  }
+  
+  console.log('CSRF protection enabled for this request');
   return false;
 }
 
@@ -100,13 +122,24 @@ app.use((req, res, next) => {
   return csrfProtection(req, res, next);
 });
 
-// Эндпоинт для выдачи CSRF токена фронту
+// Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {
-  // Если маршрут попал под байпас — токена нет; фронту он нужен только при включенном CSRF
-  if (typeof req.csrfToken === 'function') {
-    return res.json({ csrfToken: req.csrfToken() });
-  }
-  return res.json({ csrfToken: null });
+  console.log('CSRF token request received');
+  
+  // Применяем CSRF middleware только для этого эндпоинта
+  return csrfProtection(req, res, (err) => {
+    if (err) {
+      console.error('CSRF token generation error:', err);
+      return res.status(403).json({ 
+        message: 'Ошибка получения CSRF токена',
+        error: 'CSRF_ERROR'
+      });
+    }
+    
+    const token = req.csrfToken();
+    console.log('CSRF token generated successfully');
+    return res.json({ csrfToken: token });
+  });
 });
 
 // Обработка ошибок CSRF
