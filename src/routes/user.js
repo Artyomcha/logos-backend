@@ -85,7 +85,6 @@ router.post('/password', auth, async (req, res) => {
     
     res.json({ message: 'Пароль изменен' });
   } catch (error) {
-    console.error('Password change error:', error);
     res.status(500).json({ message: 'Ошибка при смене пароля' });
   }
 });
