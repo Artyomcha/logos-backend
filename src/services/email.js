@@ -11,10 +11,7 @@ console.log('========================');
 
 // Создаем transporter с портом 587 (STARTTLS) для Gmail
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: 587, // Используем порт 587 для STARTTLS
-  secure: false, // false для STARTTLS
-  requireTLS: true, // Требуем TLS
+  service: 'gmail', // Используем сервис Gmail
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
