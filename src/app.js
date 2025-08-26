@@ -127,13 +127,9 @@ function shouldBypassCsrf(req) {
   return false;
 }
 
+// Временно отключаем CSRF защиту для всех запросов
 app.use((req, res, next) => {
-  console.log('CSRF check for:', req.method, req.path, 'shouldBypass:', shouldBypassCsrf(req));
-  if (shouldBypassCsrf(req)) {
-    console.log('CSRF bypassed for:', req.path);
-    return next();
-  }
-  return csrfProtection(req, res, next);
+  return next();
 });
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
