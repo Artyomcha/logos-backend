@@ -26,10 +26,11 @@ router.get('/department', auth, async (req, res) => {
       FROM (
         SELECT date, call_duration_seconds
         FROM department_analytics 
-        GROUP BY date 
+        GROUP BY date, call_duration_seconds
         ORDER BY date DESC
         LIMIT 7
       ) subquery
+      GROUP BY date
       ORDER BY date ASC
     `);
     
@@ -150,10 +151,11 @@ router.get('/call-quality', auth, async (req, res) => {
       FROM (
         SELECT date, stages_completed, total_stages
         FROM call_quality 
-        GROUP BY date 
+        GROUP BY date, stages_completed, total_stages
         ORDER BY date DESC
         LIMIT 7
       ) subquery
+      GROUP BY date
       ORDER BY date ASC
     `);
     
