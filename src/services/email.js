@@ -32,7 +32,7 @@ async function send2FACode(to, code) {
     return result;
   } catch (error) {
     console.error('Error sending 2FA code:', error);
-    throw error;
+    throw new Error('SMTP_UNAVAILABLE');
   }
 }
 

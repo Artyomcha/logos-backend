@@ -170,31 +170,28 @@ exports.login = async (req, res) => {
     codes.set(email, { code, companyName: foundCompany });
     console.log('Stored codes:', Array.from(codes.entries()));
     
+    // Пытаемся отправить email с таймаутом 10 секунд
+    const emailPromise = send2FACode(email, code);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('TIMEOUT')), 10000);
+    });
+    
     try {
       console.log('Attempting to send 2FA code via email...');
-      await send2FACode(email, code);
+      await Promise.race([emailPromise, timeoutPromise]);
       console.log('2FA code sent successfully via email');
       res.json({ 
         message: 'Код отправлен на email',
         companyName: foundCompany
       });
     } catch (emailError) {
-      console.error('SMTP error, but 2FA code generated:', emailError);
-      // Если SMTP недоступен, возвращаем код в ответе
-      if (emailError.message === 'SMTP_UNAVAILABLE') {
-        res.json({ 
-          message: 'SMTP недоступен. Используйте код для демо',
-          demoCode: code,
-          companyName: foundCompany
-        });
-      } else {
-        // Для других ошибок также возвращаем demo код
-        res.json({ 
-          message: 'Ошибка отправки email. Используйте код для демо',
-          demoCode: code,
-          companyName: foundCompany
-        });
-      }
+      console.error('SMTP error or timeout, showing code on screen:', emailError);
+      // Если SMTP недоступен или таймаут, показываем код на экране
+      res.json({ 
+        message: 'Код показан на экране (email недоступен)',
+        demoCode: code,
+        companyName: foundCompany
+      });
     }
   } catch (error) {
     console.error('Login error:', error);
