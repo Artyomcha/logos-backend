@@ -30,48 +30,91 @@ app.set('trust proxy', (ip) => {
   return false;
 });
 
-// Helmet (базовые заголовки безопасности)
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
+// Helmet (базовые заголовки безопасности) - исключаем email
+app.use((req, res, next) => {
+  // Пропускаем Helmet для email и SMTP
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+    return next();
+  }
+  
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })(req, res, next);
+});
 
-// CORS (ограничьте origin)
-const allowedOrigins = [
-  'https://logos-tech.ru',
-  'https://www.logos-tech.ru',
-  // Добавьте другие продакшен домены если нужно
-];
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
-}));
+// CORS (ограничьте origin) - исключаем email
+app.use((req, res, next) => {
+  // Пропускаем CORS для email и SMTP
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+    return next();
+  }
+  
+  const allowedOrigins = [
+    'https://logos-tech.ru',
+    'https://www.logos-tech.ru',
+    // Добавьте другие продакшен домены если нужно
+  ];
+  
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','x-company-name','X-CSRF-Token']
+  })(req, res, next);
+});
 
 app.use(express.json());
 app.use(cookieParser());
 
-// Подключаем мониторинг безопасности
-app.use(securityMonitoring);
-app.use(fileUploadMonitoring);
-app.use(rateLimitMonitoring);
+// Подключаем мониторинг безопасности - исключаем email
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для email и SMTP
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+    return next();
+  }
+  securityMonitoring(req, res, next);
+});
 
-// Глобальный rate limit (на все API)
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для email и SMTP
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+    return next();
+  }
+  fileUploadMonitoring(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Пропускаем мониторинг для email и SMTP
+  if (req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail')) {
+    return next();
+  }
+  rateLimitMonitoring(req, res, next);
+});
+
+// Глобальный rate limit (на все API) - исключаем email
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => {
+    // Пропускаем email и SMTP запросы
+    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail');
+  }
 });
 app.use('/api/', apiLimiter);
 
-// Усиленный лимит на авторизацию/брутфорс-чувствительные роуты
+// Усиленный лимит на авторизацию/брутфорс-чувствительные роуты - исключаем email
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10
+  max: 10,
+  skip: (req) => {
+    // Пропускаем email и SMTP запросы
+    return req.path.includes('email') || req.path.includes('smtp') || req.path.includes('mail');
+  }
 });
 app.use('/api/auth', authLimiter);
 
