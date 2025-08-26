@@ -45,7 +45,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: MAX_AUDIO_SIZE, files: 1, parts: 3 },
+  limits: { fileSize: MAX_AUDIO_SIZE, files: 1, parts: 10 }, // Увеличиваем лимит частей
   fileFilter: (req, file, cb) => {
     console.log('FileFilter called with file:', {
       fieldname: file.fieldname,
@@ -227,6 +227,9 @@ router.post('/upload-audio', trainingAuth, upload.single('audio'), (err, req, re
     }
     if (err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ message: 'Можно загрузить только один файл' });
+    }
+    if (err.code === 'LIMIT_PART_COUNT') {
+      return res.status(400).json({ message: 'Слишком много полей в форме' });
     }
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({ message: 'Неожиданное поле файла' });

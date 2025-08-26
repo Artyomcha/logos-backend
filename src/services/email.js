@@ -1,6 +1,14 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+// Проверяем наличие SMTP настроек
+console.log('SMTP Configuration:', {
+  host: process.env.SMTP_HOST ? 'set' : 'not set',
+  port: process.env.SMTP_PORT ? 'set' : 'not set',
+  user: process.env.SMTP_USER ? 'set' : 'not set',
+  pass: process.env.SMTP_PASS ? 'set' : 'not set'
+});
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
