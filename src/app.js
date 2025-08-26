@@ -45,6 +45,7 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   'https://logos-tech.ru',
   'https://www.logos-tech.ru',
+  'http://localhost:3000'
   // Добавьте другие продакшен домены если нужно
 ];
 
