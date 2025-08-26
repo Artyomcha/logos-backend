@@ -78,7 +78,8 @@ const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
+    secure: true, // Отключаем secure для разработки и тестирования
+    name: 'csrf' // Явно указываем имя cookie
   }
 });
 
@@ -89,6 +90,7 @@ function shouldBypassCsrf(req) {
   const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
   const isUpload = req.path.startsWith('/api/upload') || req.path.startsWith('/api/training/upload-audio');
   const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
+  const isTrainingRoute = req.path.startsWith('/api/training/');
 
   console.log('CSRF bypass check:', {
     path: req.path,
@@ -96,7 +98,8 @@ function shouldBypassCsrf(req) {
     isApiKey,
     isMultipart,
     isUpload,
-    isCsrfTokenEndpoint
+    isCsrfTokenEndpoint,
+    isTrainingRoute
   });
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
@@ -112,6 +115,10 @@ function shouldBypassCsrf(req) {
     console.log('CSRF bypassed: CSRF token endpoint');
     return true;
   }
+  if (isTrainingRoute && hasBearer) {
+    console.log('CSRF bypassed: Training route with JWT token');
+    return true;
+  }
   
   console.log('CSRF protection enabled for this request');
   return false;
@@ -121,12 +128,16 @@ app.use((req, res, next) => {
   if (shouldBypassCsrf(req)) return next();
   
   console.log('Applying CSRF protection to:', req.method, req.path);
+  console.log('Cookies:', req.headers.cookie);
+  console.log('CSRF token in headers:', req.headers['x-csrf-token']);
+  
   return csrfProtection(req, res, next);
 });
 
 // Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {
   console.log('CSRF token request received');
+  console.log('Cookies in CSRF request:', req.headers.cookie);
   
   // Применяем CSRF middleware только для этого эндпоинта
   return csrfProtection(req, res, (err) => {
@@ -139,7 +150,8 @@ app.get('/api/csrf-token', (req, res) => {
     }
     
     const token = req.csrfToken();
-    console.log('CSRF token generated successfully');
+    console.log('CSRF token generated successfully:', token.substring(0, 10) + '...');
+    console.log('Response cookies:', res.getHeaders()['set-cookie']);
     return res.json({ csrfToken: token });
   });
 });
