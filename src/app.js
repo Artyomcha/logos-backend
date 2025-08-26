@@ -183,6 +183,10 @@ function shouldBypassCsrf(req) {
     console.log('CSRF bypassed: Training route with JWT token');
     return true;
   }
+  if (isUserRoute && hasBearer) {
+    console.log('CSRF bypassed: User route with JWT token');
+    return true;
+  }
   
   console.log('CSRF protection enabled for this request');
   return false;
