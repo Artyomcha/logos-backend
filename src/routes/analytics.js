@@ -25,7 +25,7 @@ router.get('/department', auth, async (req, res) => {
         AVG(call_duration_seconds) as avg_duration
       FROM department_analytics 
       GROUP BY date 
-      ORDER BY date DESC
+      ORDER BY date 
       LIMIT 7
     `);
     
@@ -145,7 +145,7 @@ router.get('/call-quality', auth, async (req, res) => {
         AVG(total_stages - stages_completed) as missed_stages
       FROM call_quality 
       GROUP BY date 
-      ORDER BY date DESC
+      ORDER BY date 
     `);
     
     // 3. Использование ключевых фраз
