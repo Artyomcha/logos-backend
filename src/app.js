@@ -26,8 +26,8 @@ const trainingRoutes = require('./routes/training');
 const DatabaseService = require('./services/databaseService');
 
 const app = express();
-// Trust proxy для Railway
-app.set('trust proxy', true);
+// Trust proxy для Railway - используем более безопасную настройку
+app.set('trust proxy', 1);
 
 // Helmet (базовые заголовки безопасности) - исключаем email
 app.use((req, res, next) => {
