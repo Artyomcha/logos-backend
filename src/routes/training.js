@@ -47,6 +47,13 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_AUDIO_SIZE, files: 1, parts: 3 },
   fileFilter: (req, file, cb) => {
+    console.log('FileFilter called with file:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
     const mimetype = (file.mimetype || '').toLowerCase();
     const name = file.originalname || '';
     
