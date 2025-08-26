@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const csrf = require('csrf');
+const csrf = require('csurf');
 const { securityMonitoring, fileUploadMonitoring, rateLimitMonitoring } = require('./middleware/securityMonitoring');
 require('dotenv').config();
 const path = require('path');
@@ -118,8 +118,16 @@ const uploadLimiter = rateLimit({
 app.use('/api/upload', uploadLimiter);
 app.use('/api/training/upload-audio', uploadLimiter);
 
-// CSRF защита с новым пакетом
-const tokens = new csrf();
+// CSRF защита (cookie-based) — применяем для браузерных запросов
+// Для кросс-доменных запросов фронт (logos-tech.ru) → бэк: SameSite=None и Secure обязателен
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: false, // Изменяем на false для доступа из JavaScript
+    sameSite: 'none',
+    secure: true,
+    name: 'csrf'
+  }
+});
 
 // Условный байпас CSRF для машинных клиентов (n8n, мобильные, интеграции)
 function shouldBypassCsrf(req) {
@@ -146,28 +154,22 @@ function shouldBypassCsrf(req) {
 
 app.use((req, res, next) => {
   if (shouldBypassCsrf(req)) return next();
-  
-  // Простая CSRF проверка
-  const token = req.headers['x-csrf-token'];
-  if (!token) {
-    return res.status(403).json({ 
-      message: 'CSRF токен отсутствует',
-      error: 'CSRF_ERROR'
-    });
-  }
-  next();
+  return csrfProtection(req, res, next);
 });
 
-// Эндпоинт для выдачи CSRF токена фронту
+// Эндпоинт для выдачи CSRF токена фронту (должен быть доступен без CSRF)
 app.get('/api/csrf-token', (req, res) => {
-  const secret = tokens.secretSync();
-  const token = tokens.create(secret);
-  res.cookie('csrf', secret, { 
-    httpOnly: false, 
-    sameSite: 'none', 
-    secure: true 
+  return csrfProtection(req, res, (err) => {
+    if (err) {
+      return res.status(403).json({ 
+        message: 'Ошибка получения CSRF токена',
+        error: 'CSRF_ERROR'
+      });
+    }
+    
+    const token = req.csrfToken();
+    return res.json({ csrfToken: token });
   });
-  return res.json({ csrfToken: token });
 });
 
 
