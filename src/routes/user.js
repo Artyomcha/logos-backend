@@ -58,9 +58,15 @@ router.get('/profile', auth, async (req, res) => {
 router.post('/password', auth, async (req, res) => {
   try {
     console.log('Password change request body:', req.body);
+    console.log('Request headers:', req.headers);
+    console.log('Content-Type:', req.headers['content-type']);
+    
     const { currentPassword, newPassword } = req.body;
+    console.log('Extracted currentPassword:', currentPassword);
+    console.log('Extracted newPassword:', newPassword);
     
     if (!currentPassword || !newPassword) {
+      console.log('Missing password fields:', { currentPassword: !!currentPassword, newPassword: !!newPassword });
       return res.status(400).json({ message: 'Текущий и новый пароль обязательны' });
     }
     
