@@ -146,6 +146,7 @@ function shouldBypassCsrf(req) {
   const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
   const isTrainingRoute = req.path.startsWith('/api/training/');
   const isAuthRoute = req.path.startsWith('/api/auth/');
+  const isUserRoute = req.path.startsWith('/api/user/');
   console.log('CSRF bypass check:', {
     path: req.path,
     hasBearer,
@@ -153,7 +154,8 @@ function shouldBypassCsrf(req) {
     isMultipart,
     isUpload,
     isCsrfTokenEndpoint,
-    isTrainingRoute
+    isTrainingRoute,
+    isUserRoute
   });
 
   // Браузерные формы/JSON — с CSRF; машинные интеграции или мультимедиа — без CSRF
@@ -173,6 +175,7 @@ function shouldBypassCsrf(req) {
     console.log('CSRF bypassed: auth route');
     return true;
   }
+
 
   if (isTrainingRoute && hasBearer) {
     console.log('CSRF bypassed: Training route with JWT token');
