@@ -119,6 +119,8 @@ function shouldBypassCsrf(req) {
 
 app.use((req, res, next) => {
   if (shouldBypassCsrf(req)) return next();
+  
+  console.log('Applying CSRF protection to:', req.method, req.path);
   return csrfProtection(req, res, next);
 });
 
@@ -145,6 +147,10 @@ app.get('/api/csrf-token', (req, res) => {
 // Обработка ошибок CSRF
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
+    console.error('CSRF token error for:', req.method, req.path, {
+      headers: req.headers,
+      body: req.body
+    });
     return res.status(403).json({ 
       message: 'CSRF токен недействителен или отсутствует',
       error: 'CSRF_ERROR'
