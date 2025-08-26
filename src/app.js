@@ -80,12 +80,13 @@ app.use('/api/upload', uploadLimiter);
 app.use('/api/training/upload-audio', uploadLimiter);
 
 // CSRF защита (cookie-based) — применяем для браузерных запросов
+// Для кросс-доменных запросов фронт (logos-tech.ru) → бэк: SameSite=None и Secure обязателен
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: true, // Включаем secure для HTTPS
-    name: 'csrf' // Явно указываем имя cookie
+    sameSite: 'none',
+    secure: true,
+    name: 'csrf'
   }
 });
 
@@ -97,6 +98,7 @@ function shouldBypassCsrf(req) {
   const isUpload = req.path.startsWith('/api/upload') || req.path.startsWith('/api/training/upload-audio');
   const isCsrfTokenEndpoint = req.path === '/api/csrf-token';
   const isTrainingRoute = req.path.startsWith('/api/training/');
+  const isAuthRoute = req.path.startsWith('/api/auth/');
 
   console.log('CSRF bypass check:', {
     path: req.path,
@@ -119,6 +121,10 @@ function shouldBypassCsrf(req) {
   }
   if (isCsrfTokenEndpoint) {
     console.log('CSRF bypassed: CSRF token endpoint');
+    return true;
+  }
+  if (isAuthRoute) {
+    console.log('CSRF bypassed: auth route');
     return true;
   }
   if (isTrainingRoute && hasBearer) {

@@ -113,8 +113,7 @@ async function backupLogs() {
     const filepath = path.join(BACKUP_CONFIG.logsBackupDir, filename);
     
     // Создаем tar.gz архив всех логов
-    const logsPath = process.env.NODE_ENV === 'production' ? '/app/logs' : './logs';
-    const command = `tar -czf "${filepath}" -C ${logsPath} . 2>/dev/null || echo "No logs directory found"`;
+    const command = `tar -czf "${filepath}" -C /app logs/ 2>/dev/null || echo "No logs directory found"`;
     await execAsync(command);
     
     if (fs.existsSync(filepath)) {
