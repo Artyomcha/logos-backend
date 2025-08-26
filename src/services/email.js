@@ -43,10 +43,12 @@ async function send2FACode(to, code) {
     console.error('Error message:', error.message);
     console.error('Error command:', error.command);
     console.error('Error response:', error.response);
+    console.error('Error responseCode:', error.responseCode);
+    console.error('Error responseText:', error.responseText);
     console.error('==================');
     
     // Если SMTP недоступен, возвращаем специальную ошибку
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH') {
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'EAUTH' || error.code === 'EINVALIDUSER' || error.code === 'EINVALIDPASS') {
       throw new Error('SMTP_UNAVAILABLE');
     }
     throw error;
