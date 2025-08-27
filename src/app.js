@@ -36,9 +36,9 @@ app.use(helmet({
 
 // CORS (ограничьте origin) - применяем ко всем запросам
 const allowedOrigins = [
-  'https://logos-tech.ru',
-  'https://www.logos-tech.ru',
-  // Добавьте другие продакшен домены если нужно
+    'https://logos-tech.ru',
+    'https://www.logos-tech.ru'
+    // Добавьте другие продакшен домены если нужно
 ];
 
 app.use(cors({
@@ -241,26 +241,79 @@ app.get('/', (req, res) => {
   res.send('Logos AI backend is running');
 });
 
-// Тестовый endpoint для проверки SMTP
-app.get('/test-smtp', async (req, res) => {
+// Тестовый endpoint для проверки SendGrid
+app.get('/test-sendgrid', async (req, res) => {
   try {
-    const { send2FACode } = require('./services/email');
-    console.log('Testing SMTP connection...');
+    const { send2FACode, verifySendGridConnection } = require('./services/email');
+    console.log('Testing SendGrid connection...');
+    
+    // Сначала проверяем конфигурацию
+    if (!process.env.SENDGRID_API_KEY) {
+      return res.status(400).json({ 
+        message: 'SendGrid API key not configured',
+        error: 'SENDGRID_NOT_CONFIGURED'
+      });
+    }
+    
+    // Тестируем отправку
     await send2FACode('artyomswim@gmail.com', '123456');
-    res.json({ message: 'SMTP test successful' });
+    res.json({ message: 'SendGrid test successful' });
   } catch (error) {
-    console.error('SMTP test failed:', error);
+    console.error('SendGrid test failed:', error);
     res.status(500).json({ 
-      message: 'SMTP test failed', 
+      message: 'SendGrid test failed', 
       error: error.message,
-      code: error.code,
-      command: error.command,
-      response: error.response
+      details: error.response?.body || null
     });
   }
 });
 
-const PORT = process.env.PORT || 5000;
+// Новый endpoint для подробной диагностики SendGrid
+app.get('/test-sendgrid-details', async (req, res) => {
+  try {
+    const sgMail = require('@sendgrid/mail');
+    
+    console.log('=== DETAILED SENDGRID TEST ===');
+    console.log('API Key length:', process.env.SENDGRID_API_KEY?.length || 0);
+    console.log('From Email:', process.env.SENDGRID_FROM_EMAIL);
+    console.log('To Email: artyomswim@gmail.com');
+    
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    
+    const msg = {
+      to: 'artyomswim@gmail.com',
+      from: process.env.SENDGRID_FROM_EMAIL,
+      subject: 'SendGrid Test - ' + new Date().toISOString(),
+      text: 'This is a test email from SendGrid API',
+      html: '<h1>SendGrid Test</h1><p>This is a test email sent at: ' + new Date().toISOString() + '</p>',
+    };
+    
+    console.log('Sending message:', JSON.stringify(msg, null, 2));
+    
+    const result = await sgMail.send(msg);
+    console.log('SendGrid result:', JSON.stringify(result, null, 2));
+    
+    res.json({ 
+      message: 'Detailed SendGrid test successful',
+      result: result,
+      config: {
+        apiKeyLength: process.env.SENDGRID_API_KEY?.length || 0,
+        fromEmail: process.env.SENDGRID_FROM_EMAIL,
+        toEmail: 'artyomswim@gmail.com'
+      }
+    });
+  } catch (error) {
+    console.error('Detailed SendGrid test failed:', error);
+    res.status(500).json({ 
+      message: 'Detailed SendGrid test failed', 
+      error: error.message,
+      response: error.response?.body || null,
+      statusCode: error.code
+    });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });

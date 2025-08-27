@@ -170,25 +170,47 @@ exports.login = async (req, res) => {
     codes.set(email, { code, companyName: foundCompany });
     console.log('Stored codes:', Array.from(codes.entries()));
     
-    // Пытаемся отправить email с таймаутом 10 секунд
+    // Пытаемся отправить email с таймаутом 15 секунд
     const emailPromise = send2FACode(email, code);
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('TIMEOUT')), 10000);
+      setTimeout(() => reject(new Error('TIMEOUT')), 15000);
     });
     
     try {
-      console.log('Attempting to send 2FA code via email...');
+      console.log('Attempting to send 2FA code via SendGrid...');
+      
+      // Проверяем конфигурацию SendGrid
+      if (!process.env.SENDGRID_API_KEY) {
+        console.log('SendGrid not configured, showing code on screen');
+        return res.json({ 
+          message: 'Код показан на экране (SendGrid не настроен)',
+          demoCode: code,
+          companyName: foundCompany
+        });
+      }
+
       await Promise.race([emailPromise, timeoutPromise]);
-      console.log('2FA code sent successfully via email');
+      console.log('2FA code sent successfully via SendGrid');
       res.json({ 
         message: 'Код отправлен на email',
         companyName: foundCompany
       });
     } catch (emailError) {
-      console.error('SMTP error or timeout, showing code on screen:', emailError);
-      // Если SMTP недоступен или таймаут, показываем код на экране
+      console.error('SendGrid error or timeout, showing code on screen:', emailError);
+      
+      // Более детальная обработка ошибок
+      let errorMessage = 'Код показан на экране (email недоступен)';
+      if (emailError.message === 'SENDGRID_NOT_CONFIGURED') {
+        errorMessage = 'Код показан на экране (SendGrid не настроен)';
+      } else if (emailError.message === 'TIMEOUT') {
+        errorMessage = 'Код показан на экране (email таймаут)';
+      } else if (emailError.response && emailError.response.body) {
+        console.error('SendGrid API error details:', emailError.response.body);
+        errorMessage = 'Код показан на экране (ошибка SendGrid)';
+      }
+      
       res.json({ 
-        message: 'Код показан на экране (email недоступен)',
+        message: errorMessage,
         demoCode: code,
         companyName: foundCompany
       });
