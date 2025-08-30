@@ -7,8 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Используем встроенный fetch (Node.js 18+) или node-fetch для старых версий
-const fetch = globalThis.fetch || require('node-fetch');
+
 
 const SAFE_AUDIO_MIME = new Set(['audio/wav','audio/x-wav','audio/mpeg','audio/ogg','audio/webm','audio/mp4']);
 const MAX_AUDIO_SIZE = 500 * 1024 * 1024; // Увеличиваем до 100MB
@@ -559,61 +558,6 @@ router.post('/get-evaluation', trainingAuth, async (req, res) => {
   }
 });
 
-// POST - Инициализация ElevenLabs сессии
-router.post('/initialize-elevenlabs', trainingAuth, async (req, res) => {
-  try {
-    const { conversational_ai_prompt, user_id, company_name, client_name } = req.body;
-    
-    if (!conversational_ai_prompt || !user_id || !company_name || !client_name) {
-      return res.status(400).json({ message: 'Все поля обязательны для инициализации ElevenLabs' });
-    }
-    
-    // Отправляем запрос на n8n webhook
-    const n8nWebhookUrl = 'https://logologosai.app.n8n.cloud/webhook-test/elevenlabs-training';
-    
-    const webhookData = {
-      conversational_ai_prompt,
-      user_id,
-      company_name,
-      client_name
-    };
-    
-    console.log('Forwarding to n8n webhook:', webhookData);
-    
-    let responseData = {};
-    
-    try {
-      const webhookResponse = await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(webhookData)
-      });
-      
-      if (!webhookResponse.ok) {
-        console.error('n8n webhook error:', webhookResponse.status, webhookResponse.statusText);
-        // Не возвращаем ошибку, просто логируем и продолжаем
-        console.warn('n8n webhook failed, but continuing...');
-      } else {
-        responseData = await webhookResponse.json().catch(() => ({}));
-      }
-    } catch (fetchError) {
-      console.error('Failed to connect to n8n webhook:', fetchError.message);
-      console.warn('n8n webhook unavailable, but continuing...');
-    }
-    
-    res.json({
-      success: true,
-      message: 'ElevenLabs сессия инициализирована',
-      data: responseData
-    });
-    
-  } catch (error) {
-    console.error('Error initializing ElevenLabs session:', error);
-    res.status(500).json({ message: 'Ошибка инициализации ElevenLabs сессии' });
-  }
-});
 
 // Обработка ошибок multer для training
 router.use((error, req, res, next) => {
