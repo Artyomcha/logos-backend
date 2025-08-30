@@ -556,6 +556,7 @@ router.post('/get-evaluation', trainingAuth, async (req, res) => {
   }
 });
 
+
 // Обработка ошибок multer для training
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {

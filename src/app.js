@@ -37,7 +37,8 @@ app.use(helmet({
 // CORS (ограничьте origin) - применяем ко всем запросам
 const allowedOrigins = [
     'https://logos-tech.ru',
-    'https://www.logos-tech.ru'
+    'https://www.logos-tech.ru',
+    'http://localhost:3000'
     // Добавьте другие продакшен домены если нужно
 ];
 

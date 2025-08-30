@@ -30,22 +30,65 @@ async function send2FACode(to, code) {
     
     const msg = {
       to: to,
-      from: fromEmail,
-      subject: 'Код подтверждения',
-      text: `Ваш код подтверждения: ${code}`,
+      from: {
+        email: fromEmail,
+        name: 'Logos AI System'
+      },
+      subject: 'Ваш код доступа в Logos AI',
+      text: `Здравствуйте!
+
+Вы запросили код доступа для входа в систему Logos AI.
+
+Ваш код: ${code}
+
+Этот код действителен в течение 10 минут.
+
+Если вы не запрашивали этот код, проигнорируйте это письмо.
+
+С уважением,
+Команда Logos AI`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #00e0d3; text-align: center;">Код подтверждения</h2>
-          <div style="background-color: #f5f5f5; padding: 30px; border-radius: 8px; text-align: center; margin: 20px 0;">
-            <h1 style="color: #333; font-size: 32px; letter-spacing: 5px; margin: 0;">${code}</h1>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Код доступа Logos AI</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #00e0d3; margin: 0; font-size: 24px;">Logos AI</h1>
+              <p style="color: #666; margin: 10px 0 0 0;">Система управления звонками</p>
+            </div>
+            
+            <h2 style="color: #333; margin-bottom: 20px;">Ваш код доступа</h2>
+            <p style="margin-bottom: 20px;">Здравствуйте!</p>
+            <p style="margin-bottom: 20px;">Вы запросили код доступа для входа в систему Logos AI.</p>
+            
+            <div style="background-color: #f8f9fa; border: 2px solid #00e0d3; border-radius: 8px; padding: 25px; text-align: center; margin: 25px 0;">
+              <h1 style="color: #333; font-size: 36px; letter-spacing: 8px; margin: 0; font-weight: bold;">${code}</h1>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+              <strong>⚠️ Важно:</strong> Этот код действителен в течение 10 минут.
+            </p>
+            
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; color: #856404; font-size: 13px;">
+                <strong>Безопасность:</strong> Если вы не запрашивали этот код, проигнорируйте это письмо и убедитесь, что ваш аккаунт защищен.
+              </p>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            
+            <div style="text-align: center; color: #999; font-size: 12px;">
+              <p style="margin: 0;">С уважением,<br>Команда Logos AI</p>
+              <p style="margin: 10px 0 0 0;">Это автоматическое письмо, не отвечайте на него</p>
+            </div>
           </div>
-          <p style="color: #666; text-align: center; font-size: 14px;">
-            Введите этот код для завершения входа в систему.
-          </p>
-          <p style="color: #999; text-align: center; font-size: 12px; margin-top: 30px;">
-            Если вы не запрашивали этот код, проигнорируйте это письмо.
-          </p>
-        </div>
+        </body>
+        </html>
       `,
     };
 
