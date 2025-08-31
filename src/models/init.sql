@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS call_training (
     user_id INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
     length INTEGER DEFAULT 0,
+    prompt TEXT,
     recommendations TEXT,
     quote TEXT,
     trail1_url VARCHAR(500),

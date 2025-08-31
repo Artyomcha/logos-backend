@@ -154,6 +154,7 @@ router.post('/get-cases', trainingAuth, async (req, res) => {
         id,
         title,
         length,
+        prompt,
         recommendations,
         trail1_url,
         trail1_grade,
@@ -180,7 +181,7 @@ router.post('/get-cases', trainingAuth, async (req, res) => {
 // POST - Создать новый кейс обучения
 router.post('/create-case', trainingAuth, async (req, res) => {
   try {
-    const { title, length, recommendations, userId } = req.body;
+    const { title, length, recommendations, prompt, userId } = req.body;
     
     if (!title) {
       return res.status(400).json({ message: 'Название кейса обязательно' });
@@ -204,10 +205,10 @@ router.post('/create-case', trainingAuth, async (req, res) => {
     
     // Создаем новый кейс
     const result = await connection.query(`
-      INSERT INTO call_training (user_id, title, length, recommendations, updated_at)
-      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-      RETURNING id, title, length, recommendations, updated_at
-    `, [employeeId, title, length || 0, recommendations || '']);
+      INSERT INTO call_training (user_id, title, length, recommendations, prompt, updated_at)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      RETURNING id, title, length, recommendations, prompt, updated_at
+    `, [employeeId, title, length || 0, recommendations || '', prompt || '']);
     
     res.json({
       success: true,
@@ -217,6 +218,63 @@ router.post('/create-case', trainingAuth, async (req, res) => {
   } catch (error) {
     console.error('Error creating training case:', error);
     res.status(500).json({ message: 'Ошибка создания кейса обучения' });
+  }
+});
+
+// POST - Обновить кейс обучения
+router.post('/update-case', trainingAuth, async (req, res) => {
+  try {
+    const { caseId, title, length, recommendations, prompt, userId } = req.body;
+    
+    if (!caseId) {
+      return res.status(400).json({ message: 'caseId обязателен' });
+    }
+    
+    if (!title) {
+      return res.status(400).json({ message: 'Название кейса обязательно' });
+    }
+    
+    // userId обязателен только для API ключа
+    if (req.user.apiKey && !userId) {
+      return res.status(400).json({ message: 'userId обязателен для API ключа' });
+    }
+    
+    const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
+    
+    // Получаем employee_id для указанного пользователя
+    let employeeId;
+    try {
+      employeeId = await getEmployeeId(connection, req, userId);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    
+    // Проверяем, что кейс принадлежит указанному пользователю
+    const caseResult = await connection.query(
+      'SELECT id FROM call_training WHERE id = $1 AND user_id = $2',
+      [caseId, employeeId]
+    );
+    
+    if (caseResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Кейс не найден' });
+    }
+    
+    // Обновляем кейс
+    const result = await connection.query(`
+      UPDATE call_training 
+      SET title = $1, length = $2, recommendations = $3, prompt = $4, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $5 AND user_id = $6
+      RETURNING id, title, length, prompt, recommendations, updated_at
+    `, [title, length || 0, recommendations || '', prompt || '', caseId, employeeId]);
+    
+    res.json({
+      success: true,
+      case: result.rows[0],
+      message: 'Кейс обучения обновлен'
+    });
+  } catch (error) {
+    console.error('Error updating training case:', error);
+    res.status(500).json({ message: 'Ошибка обновления кейса обучения' });
   }
 });
 
@@ -406,6 +464,7 @@ router.post('/get-case', trainingAuth, async (req, res) => {
         id,
         title,
         length,
+        prompt,
         recommendations,
         trail1_url,
         trail1_grade,
