@@ -38,30 +38,5 @@ router.get('/realtime-token', async (req, res) => {
   }
 });
 
-
-router.get('/voices', async (req, res) => {
-  try {
-    if (!process.env.ELEVENLABS_API_KEY) {
-      return res.status(500).json({ error: "API key not configured" });
-    }
-
-    const { default: fetch } = await import('node-fetch');
-    
-    const response = await fetch("https://api.elevenlabs.io/v1/voices", {
-      headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 module.exports = router;
 
