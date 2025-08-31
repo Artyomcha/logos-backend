@@ -4,7 +4,7 @@ const router = express.Router();
 // Get realtime token for ElevenLabs
 router.get('/realtime-token', async (req, res) => {
   try {
-    const fetch = require('node-fetch');
+    const { default: fetch } = await import('node-fetch');
     
     const response = await fetch("https://api.elevenlabs.io/v1/realtime/sessions", {
       method: "POST",
