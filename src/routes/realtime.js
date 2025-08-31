@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 require('dotenv').config();
 
-
-// Get realtime token for ElevenLabs
+// Get realtime connection info for ElevenLabs
 router.get('/realtime-token', async (req, res) => {
   try {
     // Проверяем наличие API ключа
@@ -15,40 +14,29 @@ router.get('/realtime-token', async (req, res) => {
       });
     }
 
-    console.log("Making request to ElevenLabs API...");
+    console.log("Preparing realtime connection info...");
     console.log("API Key present:", process.env.ELEVENLABS_API_KEY ? "YES" : "NO");
     console.log("API Key length:", process.env.ELEVENLABS_API_KEY?.length || 0);
 
-    const { default: fetch } = await import('node-fetch');
-    
-    const response = await fetch("https://api.elevenlabs.io/v1/realtime", {
-      method: "POST",
-      headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        voice: "Rachel",
-        model: "eleven_multilingual_v2",
-      }),
-    });
+    // Возвращаем данные для WebSocket подключения
+    const realtimeData = {
+      websocket_url: "wss://api.elevenlabs.io/v1/text-to-speech/stream",
+      api_key: process.env.ELEVENLABS_API_KEY,
+      voice_id: "Rachel", // или любой другой voice ID
+      model_id: "eleven_multilingual_v2",
+      // Альтернативный формат для совместимости
+      client_secret: {
+        value: process.env.ELEVENLABS_API_KEY
+      }
+    };
 
-    console.log("ElevenLabs response status:", response.status);
-    console.log("ElevenLabs response headers:", Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("ElevenLabs error response:", text);
-      throw new Error(`Error from ElevenLabs (${response.status}): ${text}`);
-    }
-
-    const data = await response.json();
-    console.log("ElevenLabs success response:", data);
-    res.status(200).json(data);
+    console.log("Realtime connection data prepared successfully");
+    res.status(200).json(realtimeData);
   } catch (err) {
-    console.error("Realtime token fetch error:", err);
+    console.error("Realtime connection preparation error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 module.exports = router;
+
