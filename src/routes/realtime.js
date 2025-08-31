@@ -21,7 +21,7 @@ router.get('/realtime-token', async (req, res) => {
 
     const { default: fetch } = await import('node-fetch');
     
-    const response = await fetch("https://api.elevenlabs.io/v1/realtime/sessions", {
+    const response = await fetch("https://api.elevenlabs.io/v1/realtime", {
       method: "POST",
       headers: {
         "xi-api-key": process.env.ELEVENLABS_API_KEY,
