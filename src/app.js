@@ -23,7 +23,6 @@ const employeeStatsRoutes = require('./routes/employeeStats');
 const employeeRoutes = require('./routes/employee');
 const apiKeysRoutes = require('./routes/apiKeys');
 const trainingRoutes = require('./routes/training');
-const realtimeRoutes = require('./routes/realtime');
 const DatabaseService = require('./services/databaseService');
 
 const app = express();
@@ -212,7 +211,7 @@ app.use('/api/employee-stats', employeeStatsRoutes);
 app.use('/api/employee', employeeRoutes);
 app.use('/api/keys', apiKeysRoutes);
 app.use('/api/training', trainingRoutes);
-app.use('/api', realtimeRoutes);
+app.use('/api');
 
 // Get all companies
 app.get('/api/companies', async (req, res) => {
