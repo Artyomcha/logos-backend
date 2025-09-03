@@ -39,7 +39,7 @@ const allowedOrigins = [
     'https://logos-tech.ru',
     'https://www.logos-tech.ru',
     'http://localhost:3000',
-    'http:/45.130.213.56:3000'
+    'http://45.130.213.56:3000'
     // Добавьте другие продакшен домены если нужно
 ];
 
