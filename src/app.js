@@ -211,7 +211,6 @@ app.use('/api/employee-stats', employeeStatsRoutes);
 app.use('/api/employee', employeeRoutes);
 app.use('/api/keys', apiKeysRoutes);
 app.use('/api/training', trainingRoutes);
-app.use('/api');
 
 // Get all companies
 app.get('/api/companies', async (req, res) => {
