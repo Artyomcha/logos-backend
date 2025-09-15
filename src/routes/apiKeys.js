@@ -32,4 +32,21 @@ router.get('/test', apiKeyAuthMiddleware, async (req, res) => {
   });
 });
 
+// Возврат OPENAI API KEY из .env (только для авторизованных пользователей)
+router.get('/openai', auth, async (req, res) => {
+  try {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) {
+      return res.status(500).json({ message: 'OPENAI_API_KEY не настроен на сервере' });
+    }
+    // Можно ограничить роль, если нужно:
+    // if (req.user.role !== 'manager') return res.status(403).json({ message: 'Доступ запрещен' });
+
+    return res.json({ apiKey: key });
+  } catch (error) {
+    console.error('Error getting OPENAI_API_KEY:', error);
+    return res.status(500).json({ message: 'Ошибка получения ключа' });
+  }
+});
+
 module.exports = router; 
