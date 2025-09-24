@@ -336,10 +336,14 @@ router.get('/call-quality', auth, async (req, res) => {
       engagement: {
         data: clientEngagementResult.rows.map(row => ({
           date: row.date,
-          engagement: Math.round(row.avg_speech_percentage || 0)
+          engagement: Math.round(Number(row.avg_speech_percentage) || 0)
         })),
-        average: Math.round(clientEngagementResult.rows.reduce((sum, row) => 
-          sum + (row.avg_speech_percentage || 0), 0) / (clientEngagementResult.rows.length || 1)),
+        average: Math.round(
+          clientEngagementResult.rows.reduce(
+            (sum, row) => sum + Number(row.avg_speech_percentage || 0),
+            0
+          ) / (clientEngagementResult.rows.length || 1)
+        ),
         trend: clientEngagementResult.rows.length >= 2 && 
                clientEngagementResult.rows[0].avg_speech_percentage > 
                clientEngagementResult.rows[clientEngagementResult.rows.length - 1].avg_speech_percentage 
