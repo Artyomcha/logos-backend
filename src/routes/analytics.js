@@ -202,12 +202,16 @@ router.get('/call-quality', auth, async (req, res) => {
       SELECT 
         date,
         AVG(client_speech_percentage) as avg_speech_percentage
-      FROM call_quality 
-      WHERE client_speech_percentage IS NOT NULL
-        AND date >= CURRENT_DATE - INTERVAL '30 days'
+      FROM (
+        SELECT date, client_speech_percentage
+        FROM call_quality
+        WHERE client_speech_percentage IS NOT NULL
+          AND date >= CURRENT_DATE - INTERVAL '30 days'
+        ORDER BY date DESC
+        LIMIT 7
+      ) subquery
       GROUP BY date
       ORDER BY date ASC
-      LIMIT 7
     `);
 
     // 6. Эмоциональный тон распределение - все сотрудники
