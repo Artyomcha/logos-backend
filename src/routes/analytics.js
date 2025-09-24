@@ -126,12 +126,65 @@ router.post('/department', auth, async (req, res) => {
   }
 });
 
-// Получить данные для графиков качества звонков + поведения клиента
-// Получить данные для графиков качества звонков + поведения клиента
+// Получить данные для графиков качества звонков
 router.get('/call-quality', auth, async (req, res) => {
   try {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
     
+    // Клиентское поведение по отделу (за 30 дней)
+    const engagementByDayResult = await connection.query(`
+      SELECT 
+        date,
+        AVG(client_speech_percentage) as avg_client_speech
+      FROM call_quality 
+      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY date
+      ORDER BY date ASC
+    `);
+
+    // Средний % речи клиента за период (по всем звонкам)
+    const engagementAvgResult = await connection.query(`
+      SELECT 
+        ROUND(AVG(client_speech_percentage)::DECIMAL, 2) as avg_engagement
+      FROM call_quality 
+      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+
+    const emotionalDistributionResult = await connection.query(`
+      SELECT 
+        COALESCE(emotional_tone, 'neutral') as emotional_tone,
+        COUNT(*) as cnt
+      FROM call_quality 
+      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY COALESCE(emotional_tone, 'neutral')
+    `);
+
+    // Проценты по дням: доля звонков с фразами интереса/отказа среди всех звонков за день
+    const triggersByDayResult = await connection.query(`
+      WITH daily AS (
+        SELECT 
+          date,
+          COUNT(*) AS total_calls,
+          COUNT(*) FILTER (
+            WHERE COALESCE(interest_phrases, '') <> '' 
+              AND jsonb_array_length(interest_phrases::jsonb) > 0
+          ) AS calls_with_interest,
+          COUNT(*) FILTER (
+            WHERE COALESCE(rejection_phrases, '') <> '' 
+              AND jsonb_array_length(rejection_phrases::jsonb) > 0
+          ) AS calls_with_rejection
+        FROM call_quality
+        WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY date
+      )
+      SELECT 
+        date,
+        CASE WHEN total_calls > 0 THEN ROUND(calls_with_interest::DECIMAL * 100 / total_calls, 2) ELSE 0 END AS interest_percent,
+        CASE WHEN total_calls > 0 THEN ROUND(calls_with_rejection::DECIMAL * 100 / total_calls, 2) ELSE 0 END AS rejection_percent
+      FROM daily
+      ORDER BY date ASC
+    `);
+
     // 1. Соблюдение скрипта - % звонков с выполнением всех этапов
     const scriptComplianceResult = await connection.query(`
       SELECT 
@@ -149,11 +202,15 @@ router.get('/call-quality', auth, async (req, res) => {
         date,
         AVG(stages_completed::DECIMAL / total_stages::DECIMAL * 100) as completion_rate,
         AVG(total_stages - stages_completed) as missed_stages
-      FROM call_quality 
-      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+      FROM (
+        SELECT date, stages_completed, total_stages
+        FROM call_quality 
+        GROUP BY date, stages_completed, total_stages
+        ORDER BY date DESC
+        LIMIT 7
+      ) subquery
       GROUP BY date
-      ORDER BY date DESC
-      LIMIT 7
+      ORDER BY date ASC
     `);
     
     // 3. Использование ключевых фраз
@@ -193,115 +250,63 @@ router.get('/call-quality', auth, async (req, res) => {
       WHERE cq.forbidden_phrases_count > 0
       ORDER BY cq.forbidden_phrases_count DESC
     `);
-
-    // НОВЫЕ ЗАПРОСЫ ДЛЯ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
-
-    // 5. Вовлеченность клиента (% речи клиента) по дням - все сотрудники
-    const clientEngagementResult = await connection.query(`
-      SELECT 
-        date,
-        AVG(client_speech_percentage) as avg_speech_percentage
-      FROM call_quality 
-      WHERE client_speech_percentage IS NOT NULL
-        AND date >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY date
-      ORDER BY date DESC
-      LIMIT 7
-    `);
-
-    // 6. Эмоциональный тон распределение - все сотрудники
-    const emotionalToneResult = await connection.query(`
-      SELECT 
-        emotional_tone,
-        COUNT(*) as count
-      FROM call_quality 
-      WHERE date >= CURRENT_DATE - INTERVAL '30 days' 
-        AND emotional_tone IS NOT NULL
-      GROUP BY emotional_tone
-    `);
-
-    // 7. Фразы интереса и отказа - все сотрудники
-    const phrasesResult = await connection.query(`
-      SELECT 
-        interest_phrases,
-        rejection_phrases
-      FROM call_quality 
-      WHERE date >= CURRENT_DATE - INTERVAL '30 days' 
-        AND (interest_phrases IS NOT NULL OR rejection_phrases IS NOT NULL)
-    `);
-
-    // 8. Триггеры по дням - новый запрос
-    const triggersByDayResult = await connection.query(`
-      SELECT 
-        date,
-        COUNT(CASE WHEN interest_phrases IS NOT NULL AND interest_phrases != '[]' THEN 1 END) as interest_count,
-        COUNT(CASE WHEN rejection_phrases IS NOT NULL AND rejection_phrases != '[]' THEN 1 END) as rejection_count
-      FROM call_quality 
-      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY date
-      ORDER BY date DESC
-      LIMIT 7
-    `);
-
-    // Обработка фраз интереса и отказа
-    let interestPhrases = {};
-    let rejectionPhrases = {};
     
-    phrasesResult.rows.forEach(row => {
-      // Парсим фразы интереса
-      if (row.interest_phrases) {
-        try {
-          const phrases = JSON.parse(row.interest_phrases);
-          if (Array.isArray(phrases)) {
-            phrases.forEach(phrase => {
-              interestPhrases[phrase] = (interestPhrases[phrase] || 0) + 1;
-            });
-          }
-        } catch (e) {
-          // Если не JSON, то просто текст - разделяем по запятой
-          const phrases = row.interest_phrases.split(',');
-          phrases.forEach(phrase => {
-            const trimmed = phrase.trim();
-            if (trimmed) {
-              interestPhrases[trimmed] = (interestPhrases[trimmed] || 0) + 1;
-            }
-          });
-        }
-      }
-      
-      // Парсим фразы отказа
-      if (row.rejection_phrases) {
-        try {
-          const phrases = JSON.parse(row.rejection_phrases);
-          if (Array.isArray(phrases)) {
-            phrases.forEach(phrase => {
-              rejectionPhrases[phrase] = (rejectionPhrases[phrase] || 0) + 1;
-            });
-          }
-        } catch (e) {
-          // Если не JSON, то просто текст - разделяем по запятой
-          const phrases = row.rejection_phrases.split(',');
-          phrases.forEach(phrase => {
-            const trimmed = phrase.trim();
-            if (trimmed) {
-              rejectionPhrases[trimmed] = (rejectionPhrases[trimmed] || 0) + 1;
-            }
-          });
-        }
-      }
-    });
+    // Построение распределения эмоционального тона
+    const emotionalDistribution = emotionalDistributionResult.rows.reduce((acc, row) => {
+      const total = Number(row.cnt || 0);
+      const key = String(row.emotional_tone || 'neutral');
+      acc[key] = (acc[key] || 0) + total;
+      return acc;
+    }, { positive: 0, neutral: 0, negative: 0 });
 
-    // Сортируем топ-5 фраз
-    const topInterestPhrases = Object.entries(interestPhrases)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5);
-    
-    const topRejectionPhrases = Object.entries(rejectionPhrases)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5);
+    // Вычисление доминирующего тона
+    const dominantTone = Object.entries(emotionalDistribution)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
+
+    // Простой тренд по вовлеченности: сравнение последних и первых значений
+    const engagementSeries = engagementByDayResult.rows.map(r => Number(r.avg_client_speech || 0));
+    let engagementTrend = 'flat';
+    if (engagementSeries.length >= 3) {
+      // Сравним среднее последних 3 дней с средним первых 3 дней для устойчивости
+      const first = engagementSeries.slice(0, 3).reduce((a,b)=>a+b,0) / 3;
+      const last = engagementSeries.slice(-3).reduce((a,b)=>a+b,0) / 3;
+      const diff = last - first;
+      engagementTrend = diff > 1 ? 'up' : diff < -1 ? 'down' : 'flat';
+    } else if (engagementSeries.length >= 2) {
+      const diff = engagementSeries[engagementSeries.length - 1] - engagementSeries[0];
+      engagementTrend = diff > 1 ? 'up' : diff < -1 ? 'down' : 'flat';
+    }
 
     res.json({
-      // СУЩЕСТВУЮЩИЕ ДАННЫЕ КАЧЕСТВА ЗВОНКОВ
+      // Клиентское поведение (для ClientAction)
+      engagement: {
+        data: engagementByDayResult.rows.map(row => ({
+          date: row.date,
+          engagement: Math.round(Number(row.avg_client_speech || 0))
+        })),
+        average: Math.round(Number(engagementAvgResult.rows[0]?.avg_engagement || 0)),
+        trend: engagementTrend
+      },
+      emotionalTone: {
+        distribution: {
+          positive: Number(emotionalDistribution.positive || 0),
+          neutral: Number(emotionalDistribution.neutral || 0),
+          negative: Number(emotionalDistribution.negative || 0)
+        },
+        dominant: dominantTone
+      },
+      triggersByDay: {
+        data: triggersByDayResult.rows.map(row => ({
+          date: row.date,
+          // Возвращаем проценты под старыми ключами, фронт ожидает проценты на оси
+          interestCount: Number(row.interest_percent || 0),
+          rejectionCount: Number(row.rejection_percent || 0)
+        }))
+      },
+      summary: {
+        totalCalls: Number(scriptComplianceResult.rows[0]?.total_calls || 0)
+      },
+      // Существующий блок аналитики качества
       scriptCompliance: {
         avgCompliance: Math.round(scriptComplianceResult.rows[0]?.avg_compliance || 0),
         totalCalls: scriptComplianceResult.rows[0]?.total_calls || 0,
@@ -327,47 +332,6 @@ router.get('/call-quality', auth, async (req, res) => {
           count: parseInt(row.incidents_count),
           phrases: row.phrases_list || ''
         }))
-      },
-
-      // НОВЫЕ ДАННЫЕ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
-      engagement: {
-        data: clientEngagementResult.rows.map(row => ({
-          date: row.date,
-          engagement: Math.round(row.avg_speech_percentage || 0)
-        })),
-        average: Math.round(clientEngagementResult.rows.reduce((sum, row) => 
-          sum + (row.avg_speech_percentage || 0), 0) / (clientEngagementResult.rows.length || 1)),
-        trend: clientEngagementResult.rows.length >= 2 && 
-               clientEngagementResult.rows[0].avg_speech_percentage > 
-               clientEngagementResult.rows[clientEngagementResult.rows.length - 1].avg_speech_percentage 
-               ? 'up' : 'down'
-      },
-      emotionalTone: {
-        distribution: emotionalToneResult.rows.reduce((acc, row) => {
-          acc[row.emotional_tone] = parseInt(row.count);
-          return acc;
-        }, {}),
-        dominant: emotionalToneResult.rows.length > 0 
-          ? emotionalToneResult.rows.reduce((max, row) => 
-              parseInt(row.count) > parseInt(max.count) ? row : max).emotional_tone
-          : 'neutral'
-      },
-      triggersByDay: {
-        data: triggersByDayResult.rows.map(row => ({
-          date: row.date,
-          interestCount: parseInt(row.interest_count || 0),
-          rejectionCount: parseInt(row.rejection_count || 0)
-        }))
-      },
-      interestTriggers: {
-        interestPhrases: topInterestPhrases.map(([phrase, count]) => ({ phrase, count })),
-        rejectionPhrases: topRejectionPhrases.map(([phrase, count]) => ({ phrase, count })),
-        totalInterestPhrases: Object.values(interestPhrases).reduce((sum, count) => sum + count, 0),
-        totalRejectionPhrases: Object.values(rejectionPhrases).reduce((sum, count) => sum + count, 0)
-      },
-      summary: {
-        totalCalls: scriptComplianceResult.rows[0]?.total_calls || 0,
-        periodDays: 30
       }
     });
   } catch (error) {
@@ -376,7 +340,7 @@ router.get('/call-quality', auth, async (req, res) => {
   }
 });
 
-// Добавить данные качества звонков + поведения клиента
+// Добавить данные качества звонков
 router.post('/call-quality', auth, async (req, res) => {
   try {
     const { 
@@ -388,7 +352,6 @@ router.post('/call-quality', auth, async (req, res) => {
       keyPhrasesUsed,
       forbiddenPhrasesCount,
       forbiddenPhrasesList,
-      // НОВЫЕ ПОЛЯ ПОВЕДЕНИЯ КЛИЕНТА
       clientSpeechPercentage,
       emotionalTone,
       interestPhrases,
@@ -413,15 +376,6 @@ router.post('/call-quality', auth, async (req, res) => {
     
     const employeeId = employeeResult.rows[0].id;
     
-    // Преобразуем массивы фраз в JSON строки
-    const interestPhrasesJson = Array.isArray(interestPhrases) 
-      ? JSON.stringify(interestPhrases) 
-      : interestPhrases || '[]';
-    
-    const rejectionPhrasesJson = Array.isArray(rejectionPhrases) 
-      ? JSON.stringify(rejectionPhrases) 
-      : rejectionPhrases || '[]';
-    
     // Проверяем, есть ли уже запись для этого звонка
     const existingRecord = await connection.query(
       'SELECT id FROM call_quality WHERE call_id = $1',
@@ -434,7 +388,8 @@ router.post('/call-quality', auth, async (req, res) => {
         UPDATE call_quality 
         SET script_compliance_percentage = $1, stages_completed = $2, total_stages = $3,
             key_phrases_used = $4, forbidden_phrases_count = $5, forbidden_phrases_list = $6,
-            client_speech_percentage = $7, emotional_tone = $8, interest_phrases = $9, rejection_phrases = $10
+            client_speech_percentage = $7, emotional_tone = $8,
+            interest_phrases = $9, rejection_phrases = $10
         WHERE call_id = $11
       `, [
         scriptCompliancePercentage || 0, 
@@ -445,8 +400,8 @@ router.post('/call-quality', auth, async (req, res) => {
         forbiddenPhrasesList || '',
         clientSpeechPercentage || 0,
         emotionalTone || 'neutral',
-        interestPhrasesJson,
-        rejectionPhrasesJson,
+        (interestPhrases == null ? '[]' : interestPhrases),
+        (rejectionPhrases == null ? '[]' : rejectionPhrases),
         callId
       ]);
     } else {
@@ -469,12 +424,12 @@ router.post('/call-quality', auth, async (req, res) => {
         forbiddenPhrasesList || '',
         clientSpeechPercentage || 0,
         emotionalTone || 'neutral',
-        interestPhrasesJson,
-        rejectionPhrasesJson
+        (interestPhrases == null ? '[]' : interestPhrases),
+        (rejectionPhrases == null ? '[]' : rejectionPhrases)
       ]);
     }
     
-    res.json({ message: 'Данные качества звонка и поведения клиента сохранены' });
+    res.json({ message: 'Данные качества звонка сохранены' });
   } catch (error) {
     console.error('Error saving call quality data:', error);
     res.status(500).json({ message: 'Ошибка сохранения данных качества звонка' });
