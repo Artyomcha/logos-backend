@@ -206,7 +206,7 @@ router.get('/call-quality', auth, async (req, res) => {
       WHERE client_speech_percentage IS NOT NULL
         AND date >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY date
-      ORDER BY date DESC
+      ORDER BY date ASC
       LIMIT 7
     `);
 
