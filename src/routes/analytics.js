@@ -197,8 +197,6 @@ router.get('/call-quality', auth, async (req, res) => {
       ORDER BY cq.forbidden_phrases_count DESC
     `);
 
-    // НОВЫЕ ЗАПРОСЫ ДЛЯ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
-
     // 5. Вовлеченность клиента (% речи клиента) по дням - все сотрудники
     const clientEngagementResult = await connection.query(`
       SELECT 
@@ -245,6 +243,8 @@ router.get('/call-quality', auth, async (req, res) => {
       ORDER BY date DESC
       LIMIT 7
     `);
+
+
 
     // Обработка фраз интереса и отказа
     let interestPhrases = {};
