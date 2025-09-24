@@ -197,25 +197,22 @@ router.get('/call-quality', auth, async (req, res) => {
       ORDER BY cq.forbidden_phrases_count DESC
     `);
 
-    // НОВЫЕ ЗАПРОСЫ ДЛЯ ПОВЕДЕНИЯ КЛИЕНТА
+    // НОВЫЕ ЗАПРОСЫ ДЛЯ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
 
-    // 5. Вовлеченность клиента (% речи клиента) по дням
+    // 5. Вовлеченность клиента (% речи клиента) по дням - все сотрудники
     const clientEngagementResult = await connection.query(`
       SELECT 
         date,
         AVG(client_speech_percentage) as avg_speech_percentage
-      FROM (
-        SELECT date, client_speech_percentage
-        FROM call_quality 
-        WHERE client_speech_percentage IS NOT NULL
-        ORDER BY date DESC
-        LIMIT 7
-      ) subquery
+      FROM call_quality 
+      WHERE client_speech_percentage IS NOT NULL
+        AND date >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY date
-      ORDER BY date ASC
+      ORDER BY date DESC
+      LIMIT 7
     `);
 
-    // 6. Эмоциональный тон распределение
+    // 6. Эмоциональный тон распределение - все сотрудники
     const emotionalToneResult = await connection.query(`
       SELECT 
         emotional_tone,
@@ -226,7 +223,7 @@ router.get('/call-quality', auth, async (req, res) => {
       GROUP BY emotional_tone
     `);
 
-    // 7. Фразы интереса и отказа (парсим JSON)
+    // 7. Фразы интереса и отказа - все сотрудники
     const phrasesResult = await connection.query(`
       SELECT 
         interest_phrases,
@@ -234,6 +231,19 @@ router.get('/call-quality', auth, async (req, res) => {
       FROM call_quality 
       WHERE date >= CURRENT_DATE - INTERVAL '30 days' 
         AND (interest_phrases IS NOT NULL OR rejection_phrases IS NOT NULL)
+    `);
+
+    // 8. Триггеры по дням - новый запрос
+    const triggersByDayResult = await connection.query(`
+      SELECT 
+        date,
+        COUNT(CASE WHEN interest_phrases IS NOT NULL AND interest_phrases != '[]' THEN 1 END) as interest_count,
+        COUNT(CASE WHEN rejection_phrases IS NOT NULL AND rejection_phrases != '[]' THEN 1 END) as rejection_count
+      FROM call_quality 
+      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY date
+      ORDER BY date DESC
+      LIMIT 7
     `);
 
     // Обработка фраз интереса и отказа
