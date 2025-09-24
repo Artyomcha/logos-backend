@@ -127,6 +127,7 @@ router.post('/department', auth, async (req, res) => {
 });
 
 // Получить данные для графиков качества звонков + поведения клиента
+// Получить данные для графиков качества звонков + поведения клиента
 router.get('/call-quality', auth, async (req, res) => {
   try {
     const connection = await DatabaseService.getCompanyConnection(req.user.companyName);
@@ -148,15 +149,11 @@ router.get('/call-quality', auth, async (req, res) => {
         date,
         AVG(stages_completed::DECIMAL / total_stages::DECIMAL * 100) as completion_rate,
         AVG(total_stages - stages_completed) as missed_stages
-      FROM (
-        SELECT date, stages_completed, total_stages
-        FROM call_quality 
-        GROUP BY date, stages_completed, total_stages
-        ORDER BY date DESC
-        LIMIT 7
-      ) subquery
+      FROM call_quality 
+      WHERE date >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY date
-      ORDER BY date ASC
+      ORDER BY date DESC
+      LIMIT 7
     `);
     
     // 3. Использование ключевых фраз
@@ -196,6 +193,8 @@ router.get('/call-quality', auth, async (req, res) => {
       WHERE cq.forbidden_phrases_count > 0
       ORDER BY cq.forbidden_phrases_count DESC
     `);
+
+    // НОВЫЕ ЗАПРОСЫ ДЛЯ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
 
     // 5. Вовлеченность клиента (% речи клиента) по дням - все сотрудники
     const clientEngagementResult = await connection.query(`
@@ -243,8 +242,6 @@ router.get('/call-quality', auth, async (req, res) => {
       ORDER BY date DESC
       LIMIT 7
     `);
-
-
 
     // Обработка фраз интереса и отказа
     let interestPhrases = {};
@@ -332,7 +329,7 @@ router.get('/call-quality', auth, async (req, res) => {
         }))
       },
 
-      // НОВЫЕ ДАННЫЕ ПОВЕДЕНИЯ КЛИЕНТА
+      // НОВЫЕ ДАННЫЕ ПОВЕДЕНИЯ КЛИЕНТА - ПО ВСЕМУ ОТДЕЛУ
       engagement: {
         data: clientEngagementResult.rows.map(row => ({
           date: row.date,
@@ -354,6 +351,13 @@ router.get('/call-quality', auth, async (req, res) => {
           ? emotionalToneResult.rows.reduce((max, row) => 
               parseInt(row.count) > parseInt(max.count) ? row : max).emotional_tone
           : 'neutral'
+      },
+      triggersByDay: {
+        data: triggersByDayResult.rows.map(row => ({
+          date: row.date,
+          interestCount: parseInt(row.interest_count || 0),
+          rejectionCount: parseInt(row.rejection_count || 0)
+        }))
       },
       interestTriggers: {
         interestPhrases: topInterestPhrases.map(([phrase, count]) => ({ phrase, count })),
