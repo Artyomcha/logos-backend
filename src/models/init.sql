@@ -1,13 +1,3 @@
--- Drop existing tables if they exist (in reverse dependency order)
-DROP TABLE IF EXISTS uploaded_files CASCADE;
-DROP TABLE IF EXISTS departament_report CASCADE;
-DROP TABLE IF EXISTS employee_weekly_stats CASCADE;
-DROP TABLE IF EXISTS employee_monthly_stats CASCADE;
-DROP TABLE IF EXISTS employee_stats CASCADE;
-DROP TABLE IF EXISTS dialogues CASCADE;
-DROP TABLE IF EXISTS overall_data CASCADE;
-DROP TABLE IF EXISTS employees CASCADE;
-DROP TABLE IF EXISTS user_auth CASCADE;
 
 -- Create user_auth table
 CREATE TABLE IF NOT EXISTS user_auth (
@@ -124,6 +114,10 @@ CREATE TABLE IF NOT EXISTS call_quality (
     forbidden_phrases_count INTEGER DEFAULT 0,
     forbidden_phrases_list TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    client_speech_percentage INTEGER DEFAULT 0;
+    emotional_tone VARCHAR(20) DEFAULT 'neutral';
+    interest_phrases TEXT; -- JSON строка с фразами интереса
+    rejection_phrases TEXT; 
     FOREIGN KEY (user_id) REFERENCES user_auth(id) ON DELETE CASCADE
 );
 
